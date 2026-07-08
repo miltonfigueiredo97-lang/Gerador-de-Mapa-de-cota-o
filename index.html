@@ -250,7 +250,22 @@ function setupPdfDropzone(){
 }
 function handleFiles(fileList){
   const files = Array.from(fileList).filter(f => f.type==='application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
-  files.forEach(f => processSupplierFile(f));
+  files.forEach(f => enqueuePdf(f));
+}
+
+const MAX_CONCURRENT_PDF = 2;
+let __activePdfCount = 0;
+const __pdfQueue = [];
+function enqueuePdf(file){
+  __pdfQueue.push(file);
+  processPdfQueue();
+}
+function processPdfQueue(){
+  while(__activePdfCount < MAX_CONCURRENT_PDF && __pdfQueue.length > 0){
+    const file = __pdfQueue.shift();
+    __activePdfCount++;
+    processSupplierFile(file).finally(() => { __activePdfCount--; processPdfQueue(); });
+  }
 }
 
 async function processSupplierFile(file){
@@ -303,9 +318,9 @@ async function pdfToImages(file, maxPages, scale){
 
 /* ============================= CLAUDE API ============================= */
 async function callClaude(content, systemPrompt){
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch('/api/claude', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({model:'claude-sonnet-4-6', max_tokens:1000, system:systemPrompt, messages:[{role:'user', content}]})
+    body: JSON.stringify({model:'claude-sonnet-5', max_tokens:2000, system:systemPrompt, messages:[{role:'user', content}]})
   });
   const data = await response.json();
   if(data.error) throw new Error(data.error.message || 'Erro na API');
