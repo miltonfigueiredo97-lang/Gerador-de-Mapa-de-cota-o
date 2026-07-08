@@ -1,6 +1,7 @@
 # Gerador de Mapa de Cotação
 
-Ferramenta que lê orçamentos em PDF (texto ou escaneado), monta a lista de insumos automaticamente e gera o mapa de cotação comparativo em .xlsx.
+Ferramenta que recebe o seu mapa de cotação já preenchido (colunas A até V: Insumo, Unidade, Qtd. prevista etc.) mais os orçamentos dos fornecedores em PDF (texto ou escaneado), e preenche automaticamente as colunas de fornecedor (Valor Unitário/Total, melhor preço, totais, condição de pagamento) — editando o próprio arquivo, preservando fórmulas, cores e formatação originais.
+
 
 ## Como funciona
 

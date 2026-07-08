@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mapa de Cotação — Automático</title>
+<title>Mapa de Cotação — Preenchimento Automático</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -42,6 +42,24 @@
   .dropzone .dz-icon{font-size:26px; margin-bottom:8px;}
   .dropzone .dz-title{font-weight:700; font-size:14.5px;}
   .dropzone .dz-sub{color:var(--ink-soft); font-size:12.5px; margin-top:4px;}
+  .templateSummary{display:none;}
+  .templateSummary.show{display:block;}
+  .sumGrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin:14px 0;}
+  .sumBox{border:1.5px solid var(--line-strong); border-radius:4px; padding:12px 14px; background:var(--paper);}
+  .sumBox .n{font-family:var(--disp); font-size:24px; font-weight:800; line-height:1;}
+  .sumBox .l{font-family:var(--mono); font-size:10.5px; text-transform:uppercase; color:var(--ink-soft); margin-top:4px; letter-spacing:.05em;}
+  table.itemsPreview{width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px;}
+  table.itemsPreview th{text-align:left; font-family:var(--mono); font-size:10.5px; text-transform:uppercase; color:var(--ink-soft); border-bottom:1.5px solid var(--ink); padding:6px 8px;}
+  table.itemsPreview td{padding:4px 8px; border-bottom:1px solid var(--line);}
+  table.itemsPreview input{width:100%; border:1px solid transparent; background:transparent; font-family:var(--sans); font-size:12.5px; padding:4px 5px; border-radius:2px;}
+  table.itemsPreview input:hover{border-color:var(--line-strong);}
+  table.itemsPreview input:focus{outline:none; border-color:var(--teal); background:var(--white);}
+  .blockChip{display:inline-flex; align-items:center; gap:6px; border:1.5px solid var(--line-strong); border-radius:14px; padding:4px 10px 4px 8px; font-size:12px; margin:3px 5px 3px 0; background:var(--white);}
+  .blockChip .dot{width:8px; height:8px; border-radius:50%; background:var(--line-strong);}
+  .blockChip.filled .dot{background:var(--teal);}
+  .errbanner{background:#FBE8E2; border:1.5px solid var(--brick); color:#6E2717; padding:10px 14px; border-radius:4px; font-size:13px; margin-top:10px;}
+  .warnbanner{background:#FCF1DC; border:1.5px solid var(--amber-deep); color:#5C3B0A; padding:10px 14px; border-radius:4px; font-size:13px; margin-top:10px;}
+  .okbanner{background:#E4F0E6; border:1.5px solid #3F7D57; color:#1E4A2C; padding:10px 14px; border-radius:4px; font-size:13px; margin-top:10px;}
   .badgeCount{font-family:var(--mono); font-size:11px; background:var(--ink); color:var(--paper); border-radius:10px; padding:1px 8px;}
   .supplierCard{border:1.5px solid var(--line-strong); border-radius:5px; margin-top:14px; overflow:hidden;}
   .supplierCard .sc-head{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; background:var(--paper-2); cursor:pointer; flex-wrap:wrap;}
@@ -56,18 +74,15 @@
   .sc-body.open{display:block;}
   .metaGrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:14px;}
   .metaGrid label{display:block; font-family:var(--mono); font-size:10.5px; text-transform:uppercase; color:var(--ink-soft); margin-bottom:3px; letter-spacing:.05em;}
-  .metaGrid input{width:100%; padding:7px 8px; border:1px solid var(--line-strong); border-radius:3px; font-size:13px; font-family:var(--sans); background:var(--white);}
-  table.itemsTbl, table.baseTbl{width:100%; border-collapse:collapse; font-size:12.5px;}
-  table.itemsTbl th, table.baseTbl th{text-align:left; font-family:var(--mono); font-size:10.5px; text-transform:uppercase; color:var(--ink-soft); border-bottom:1px solid var(--ink); padding:6px 6px;}
-  table.itemsTbl td, table.baseTbl td{padding:4px 6px; border-bottom:1px solid var(--line);}
-  table.itemsTbl input, table.baseTbl input{width:100%; border:none; background:transparent; font-family:var(--sans); font-size:12.5px; padding:3px 4px; border-radius:2px;}
-  table.itemsTbl input:hover, table.baseTbl input:hover{background:var(--paper);}
-  table.itemsTbl input:focus, table.baseTbl input:focus{outline:none; background:var(--white); box-shadow:inset 0 0 0 1.5px var(--teal);}
-  table.itemsTbl input.num, table.baseTbl input.num{font-family:var(--mono); text-align:right;}
-  .rowactions button{padding:3px 8px; font-size:11px;}
-  .errbanner{background:#FBE8E2; border:1.5px solid var(--brick); color:#6E2717; padding:10px 14px; border-radius:4px; font-size:13px; margin-top:10px;}
-  .warnbanner{background:#FCF1DC; border:1.5px solid var(--amber-deep); color:#5C3B0A; padding:10px 14px; border-radius:4px; font-size:13px; margin-top:10px;}
-  .okbanner{background:#E4F0E6; border:1.5px solid #3F7D57; color:#1E4A2C; padding:10px 14px; border-radius:4px; font-size:13px; margin-top:10px;}
+  .metaGrid input, .metaGrid select{width:100%; padding:7px 8px; border:1px solid var(--line-strong); border-radius:3px; font-size:13px; font-family:var(--sans); background:var(--white);}
+  .metaGrid .assignBox{grid-column:1 / -1; background:var(--paper); border:1.5px solid var(--amber-deep); border-radius:4px; padding:10px 12px;}
+  table.itemsTbl{width:100%; border-collapse:collapse; font-size:12.5px;}
+  table.itemsTbl th{text-align:left; font-family:var(--mono); font-size:10.5px; text-transform:uppercase; color:var(--ink-soft); border-bottom:1px solid var(--ink); padding:6px 6px;}
+  table.itemsTbl td{padding:4px 6px; border-bottom:1px solid var(--line);}
+  table.itemsTbl input{width:100%; border:none; background:transparent; font-family:var(--sans); font-size:12.5px; padding:3px 4px; border-radius:2px;}
+  table.itemsTbl input:hover{background:var(--paper);}
+  table.itemsTbl input:focus{outline:none; background:var(--white); box-shadow:inset 0 0 0 1.5px var(--teal);}
+  table.itemsTbl input.num{font-family:var(--mono); text-align:right;}
   .compWrap{overflow-x:auto; border:1px solid var(--line-strong); border-radius:4px;}
   table.compTbl{border-collapse:collapse; font-size:12.5px; min-width:900px; width:100%;}
   table.compTbl th, table.compTbl td{border:1px solid var(--line); padding:6px 8px; white-space:nowrap;}
@@ -86,18 +101,15 @@
   tr.totalRow td{background:var(--paper-2); font-weight:700; font-family:var(--mono);}
   .progressLine{font-family:var(--mono); font-size:12.5px; color:var(--teal-deep); margin-top:10px;}
   footer.note{max-width:1500px; margin:0 auto; padding:0 5vw 60px; color:var(--ink-soft); font-size:12px; line-height:1.6;}
-  details.advanced{margin-top:16px; border-top:1px dashed var(--line-strong); padding-top:12px;}
-  details.advanced summary{cursor:pointer; font-size:12.5px; color:var(--ink-soft); font-weight:600;}
-  details.advanced .inner{margin-top:10px;}
 </style>
 </head>
 <body>
 
 <header class="top">
   <div class="brandblock">
-    <div class="eyebrow">// Só os orçamentos — o resto a ferramenta monta sozinha</div>
+    <div class="eyebrow">// Preenchimento automático — direto no seu modelo, sem base salva</div>
     <h1>Mapa de Cotação</h1>
-    <p class="lede">Anexe os orçamentos em PDF dos fornecedores. A ferramenta lê cada um (mesmo escaneado), monta sozinha a lista de insumos a partir do que foi cotado, cruza os itens entre fornecedores e gera o mapa comparativo pronto pra baixar.</p>
+    <p class="lede">Suba o modelo (.xlsx) desta requisição e os orçamentos em PDF dos fornecedores. A ferramenta lê tudo, cruza os itens e preenche o próprio arquivo — mantendo fórmulas, cores e formatação originais.</p>
   </div>
   <button class="ghost small" onclick="resetAll()">↺ Recomeçar</button>
 </header>
@@ -105,13 +117,39 @@
 
 <main>
 
-  <!-- STEP 1: UPLOAD PDFS -->
-  <section class="card" id="cardUpload">
+  <!-- STEP 1: TEMPLATE -->
+  <section class="card" id="cardTemplate">
     <div class="card-head">
-      <h2><span class="stepnum">1</span> Orçamentos dos fornecedores <span class="badgeCount" id="supplierCount">0</span></h2>
+      <h2><span class="stepnum">1</span> Modelo desta requisição (.xlsx)</h2>
     </div>
     <div class="card-body">
-      <p class="hint">Solte quantos PDFs quiser — de uma vez ou aos poucos. Funciona com PDF de texto ou digitalizado (imagem). Não tem limite de fornecedores.</p>
+      <p class="hint">Suba o mapa de cotação já com a lista de insumos desta requisição (o mesmo formato que você usa hoje). A ferramenta identifica sozinha os itens e as colunas de fornecedor do seu modelo.</p>
+      <div class="dropzone" id="templateDropzone">
+        <div class="dz-icon">📊</div>
+        <div class="dz-title">Arraste o modelo .xlsx aqui ou clique para escolher</div>
+        <div class="dz-sub">Um arquivo .xlsx</div>
+        <input type="file" id="templateInput" accept=".xlsx,.xls" style="display:none">
+      </div>
+      <div id="templateError"></div>
+      <div class="templateSummary" id="templateSummary">
+        <div class="sumGrid">
+          <div class="sumBox"><div class="n" id="sumItems">0</div><div class="l">Itens encontrados</div></div>
+          <div class="sumBox"><div class="n" id="sumBlocks">0</div><div class="l">Colunas de fornecedor</div></div>
+          <div class="sumBox"><div class="n" id="sumFilled">0</div><div class="l">Já nomeadas</div></div>
+        </div>
+        <div id="blockChips"></div>
+        <table class="itemsPreview" id="itemsPreviewTbl"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- STEP 2: UPLOAD PDFS -->
+  <section class="card disabled" id="cardUpload">
+    <div class="card-head">
+      <h2><span class="stepnum">2</span> Orçamentos dos fornecedores <span class="badgeCount" id="supplierCount">0</span></h2>
+    </div>
+    <div class="card-body">
+      <p class="hint">Solte quantos PDFs quiser — de uma vez ou aos poucos. Funciona com PDF de texto ou digitalizado (imagem). Cada um é automaticamente encaixado numa coluna de fornecedor do seu modelo.</p>
       <div class="dropzone" id="dropzone">
         <div class="dz-icon">📄</div>
         <div class="dz-title">Arraste os PDFs aqui ou clique para escolher</div>
@@ -119,31 +157,20 @@
         <input type="file" id="pdfInput" accept="application/pdf" multiple style="display:none">
       </div>
       <div id="suppliersWrap"></div>
-
-      <details class="advanced">
-        <summary>Caso raro: já tenho a lista de insumos pronta e quero usar essa lista em vez da automática</summary>
-        <div class="inner">
-          <p class="hint">Só use isso se precisar forçar uma lista específica de itens (com Insumo / Unidade / Qtd. prevista) em vez de deixar a ferramenta montar a partir dos orçamentos.</p>
-          <input type="file" id="baseFileInput" accept=".xlsx,.xls" style="display:none">
-          <button class="small" onclick="document.getElementById('baseFileInput').click()">Importar lista de uma planilha (.xlsx)</button>
-          <button class="small ghost" onclick="clearManualBase()">Voltar ao automático</button>
-          <div id="baseStatus" class="hint" style="margin-top:8px;"></div>
-        </div>
-      </details>
     </div>
   </section>
 
-  <!-- STEP 2: COMPARISON -->
+  <!-- STEP 3: COMPARISON -->
   <section class="card disabled" id="cardComp">
     <div class="card-head">
-      <h2><span class="stepnum">2</span> Comparativo</h2>
+      <h2><span class="stepnum">3</span> Comparativo</h2>
       <div style="display:flex; gap:8px;">
         <button class="primary" id="btnGenerate" onclick="generateComparison()" disabled>Gerar comparativo</button>
-        <button class="amber" id="btnExport" onclick="exportWorkbook()" disabled>⬇ Baixar mapa (.xlsx)</button>
+        <button class="amber" id="btnExport" onclick="exportPatchedXlsx()" disabled>⬇ Baixar modelo preenchido (.xlsx)</button>
       </div>
     </div>
     <div class="card-body">
-      <p class="hint">Prévia editável — clique em qualquer valor pra corrigir, ou troque a correspondência no seletor de cada célula.</p>
+      <p class="hint">Prévia editável — clique em qualquer valor pra corrigir. O download aplica esses valores diretamente no seu arquivo original, então as fórmulas de melhor preço e total do seu modelo recalculam sozinhas ao abrir no Excel.</p>
       <div id="progressWrap"></div>
       <div id="compWrap"></div>
     </div>
@@ -152,14 +179,14 @@
 </main>
 
 <footer class="note">
-  Este processamento roda no seu navegador: os PDFs viram imagem e são enviados para leitura via API da Anthropic só durante a análise, e o arquivo final é gerado e baixado localmente — nada fica salvo em servidor. Sempre confira os valores extraídos antes de usar o mapa para decisão de compra.
+  Este processamento roda no seu navegador: os PDFs viram imagem e são enviados para leitura via API da Anthropic só durante a análise, e o arquivo final é montado e baixado localmente — nada fica salvo em servidor. Sempre confira os valores extraídos antes de usar o mapa para decisão de compra.
 </footer>
 
 <script>
 /* ============================= STATE ============================= */
-let suppliers = [];        // {id, fileName, status, error, fornecedor, condPagamento, prazoEntrega, frete, itens:[...], matches:{row:{itemIndex,confidence}}, open}
-let baseItems = null;      // null = auto-derive from PDFs. Otherwise: [{row, insumo, unidade, qtd}] (manual override list)
-let derivedItems = null;   // the auto-derived (or manually imported) working list actually used for the last generated comparison
+let templateBuffer = null;   // ArrayBuffer of the uploaded template, kept pristine for later patching
+let templateAnalysis = null; // {sheetName, headerRow, colInsumo, colUnidade, colQtd, items:[{row,insumo,unidade,qtd}], blocks:[{labelRow,unitCol,label,nameRow,name,totalCol,totalRow,freteRow,condRow,prazoRow}]}
+let suppliers = [];           // {id, fileName, status, error, fornecedor, condPagamento, prazoEntrega, frete, itens:[...], matches:{rowKey:{itemIndex,confidence}}, assignedBlock:index|null, open}
 
 function uid(){ return 'id' + Math.random().toString(36).slice(2,10); }
 function escHtml(s){ return String(s===undefined||s===null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -171,22 +198,34 @@ function numOrEmpty(v){ return (v===null||v===undefined)?'':v; }
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+  setupTemplateDropzone();
   setupPdfDropzone();
+  document.getElementById('templateInput').addEventListener('change', e => { if(e.target.files[0]) loadTemplate(e.target.files[0]); e.target.value=''; });
   document.getElementById('pdfInput').addEventListener('change', e => { handleFiles(e.target.files); e.target.value=''; });
-  document.getElementById('baseFileInput').addEventListener('change', e => { if(e.target.files[0]) importBaseXlsx(e.target.files[0]); e.target.value=''; });
 });
 
 function resetAll(){
-  if(!confirm('Isso limpa os fornecedores carregados e o comparativo. Continuar?')) return;
-  suppliers = []; baseItems = null; derivedItems = null;
+  if(!confirm('Isso limpa o modelo carregado, os fornecedores e o comparativo. Continuar?')) return;
+  templateBuffer = null; templateAnalysis = null; suppliers = [];
+  document.getElementById('templateSummary').classList.remove('show');
+  document.getElementById('templateError').innerHTML = '';
+  document.getElementById('cardUpload').classList.add('disabled');
+  document.getElementById('cardComp').classList.add('disabled');
   document.getElementById('suppliersWrap').innerHTML = '';
-  document.getElementById('baseStatus').innerHTML = '';
   document.getElementById('compWrap').innerHTML = '';
   document.getElementById('progressWrap').innerHTML = '';
   updateButtons();
 }
 
-/* ============================= OPTIONAL: MANUAL BASE LIST IMPORT ============================= */
+/* ============================= STEP 1: TEMPLATE ANALYSIS ============================= */
+function setupTemplateDropzone(){
+  const dz = document.getElementById('templateDropzone');
+  dz.addEventListener('click', () => document.getElementById('templateInput').click());
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); }));
+  dz.addEventListener('drop', e => { if(e.dataTransfer.files[0]) loadTemplate(e.dataTransfer.files[0]); });
+}
+
 function cellText(ws, r, c){
   const ref = XLSX.utils.encode_cell({r,c});
   const cell = ws[ref];
@@ -200,47 +239,106 @@ function cellNum(ws, r, c){
   const n = Number(cell.v);
   return isNaN(n) ? null : n;
 }
-async function importBaseXlsx(file){
-  const statusBox = document.getElementById('baseStatus');
-  statusBox.innerHTML = '';
-  try{
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, {type:'array'});
-    const sheetName = wb.SheetNames.find(n => /cota/i.test(n)) || wb.SheetNames[0];
-    const ws = wb.Sheets[sheetName];
-    const range = XLSX.utils.decode_range(ws['!ref']);
-    let headerRow = -1, colInsumo = -1;
-    for(let r=range.s.r; r<=range.e.r && headerRow<0; r++){
-      for(let c=range.s.c; c<=range.e.c; c++){
-        if(cellText(ws,r,c).toLowerCase() === 'insumo'){ headerRow=r; colInsumo=c; break; }
-      }
+
+function analyzeTemplate(wb){
+  const sheetName = wb.SheetNames.find(n => /cota/i.test(n)) || wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  if(!ws['!ref']) throw new Error('A planilha "' + sheetName + '" parece estar vazia.');
+  const range = XLSX.utils.decode_range(ws['!ref']);
+
+  let headerRow = -1, colInsumo = -1;
+  for(let r = range.s.r; r <= range.e.r && headerRow < 0; r++){
+    for(let c = range.s.c; c <= range.e.c; c++){
+      if(cellText(ws,r,c).toLowerCase() === 'insumo'){ headerRow = r; colInsumo = c; break; }
     }
-    if(headerRow < 0) throw new Error('Não encontrei uma coluna "Insumo" nesta planilha.');
-    let colUnidade=-1, colQtd=-1;
-    for(let c=range.s.c;c<=range.e.c;c++){
-      const t = cellText(ws,headerRow,c).toLowerCase();
-      if(t==='unidade') colUnidade=c;
-      if(/prevista/.test(t)) colQtd=c;
-    }
-    const items = [];
-    for(let r=headerRow+1;r<=range.e.r;r++){
-      const insumo = cellText(ws,r,colInsumo);
-      if(!insumo) break;
-      items.push({row:r, insumo, unidade: cellText(ws,r,colUnidade), qtd: cellNum(ws,r,colQtd)});
-    }
-    if(items.length===0) throw new Error('Encontrei a coluna "Insumo" mas nenhuma linha de item abaixo dela.');
-    baseItems = items;
-    statusBox.innerHTML = `<span style="color:#1E4A2C; font-weight:600;">✓ ${items.length} itens importados — serão usados no lugar da lista automática.</span>`;
-  }catch(err){
-    statusBox.innerHTML = `<div class="errbanner">Não consegui importar: ${escHtml(err.message)}</div>`;
   }
-}
-function clearManualBase(){
-  baseItems = null;
-  document.getElementById('baseStatus').innerHTML = '<span style="color:var(--ink-soft);">Lista automática restaurada.</span>';
+  if(headerRow < 0) throw new Error('Não encontrei uma coluna chamada "Insumo" nesta planilha. Confira se é o modelo certo.');
+
+  let colUnidade = -1, colQtd = -1;
+  for(let c = range.s.c; c <= range.e.c; c++){
+    const t = cellText(ws,headerRow,c).toLowerCase();
+    if(t === 'unidade') colUnidade = c;
+    if(/prevista/.test(t)) colQtd = c;
+  }
+
+  const items = [];
+  for(let r = headerRow+1; r <= range.e.r; r++){
+    const insumo = cellText(ws,r,colInsumo);
+    if(!insumo) break;
+    items.push({row:r, insumo, unidade: cellText(ws,r,colUnidade), qtd: cellNum(ws,r,colQtd)});
+  }
+  if(items.length === 0) throw new Error('Encontrei a coluna "Insumo" mas nenhuma linha de item abaixo dela.');
+
+  let blocks = [];
+  for(let r = range.s.r; r <= range.e.r; r++){
+    for(let c = range.s.c; c <= range.e.c; c++){
+      const t = cellText(ws,r,c);
+      if(/^FORNECEDOR\s*\d+/i.test(t)) blocks.push({labelRow:r, unitCol:c, label:t});
+    }
+  }
+  blocks.sort((a,b) => a.unitCol - b.unitCol);
+  blocks.forEach(b => {
+    b.nameRow = b.labelRow + 1;
+    b.name = cellText(ws, b.nameRow, b.unitCol);
+    b.totalCol = b.unitCol + 1;
+    for(let r = headerRow; r <= range.e.r; r++){
+      const t = cellText(ws, r, b.unitCol).toUpperCase();
+      if(t === 'TOTAL') b.totalRow = r;
+      else if(t === 'FRETE') b.freteRow = r;
+      else if(t.indexOf('CONDI') === 0) b.condRow = r;
+      else if(t.indexOf('PRAZO') === 0) b.prazoRow = r;
+    }
+  });
+  if(blocks.length === 0) throw new Error('Não encontrei colunas "FORNECEDOR 1, FORNECEDOR 2..." nesta planilha. Confira se é o modelo certo.');
+
+  return {sheetName, headerRow, colInsumo, colUnidade, colQtd, items, blocks};
 }
 
-/* ============================= STEP 1: PDF UPLOAD ============================= */
+async function loadTemplate(file){
+  const errBox = document.getElementById('templateError');
+  errBox.innerHTML = '';
+  try{
+    templateBuffer = await file.arrayBuffer();
+    const wb = XLSX.read(templateBuffer, {type:'array'});
+    templateAnalysis = analyzeTemplate(wb);
+    renderTemplateSummary();
+    document.getElementById('cardUpload').classList.remove('disabled');
+  }catch(err){
+    templateBuffer = null; templateAnalysis = null;
+    document.getElementById('templateSummary').classList.remove('show');
+    errBox.innerHTML = `<div class="errbanner">Não consegui ler este modelo: ${escHtml(err.message)}.</div>`;
+    document.getElementById('cardUpload').classList.add('disabled');
+  }
+  updateButtons();
+}
+
+function renderTemplateSummary(){
+  const a = templateAnalysis;
+  document.getElementById('sumItems').textContent = a.items.length;
+  document.getElementById('sumBlocks').textContent = a.blocks.length;
+  document.getElementById('sumFilled').textContent = a.blocks.filter(b => b.name).length;
+  const chips = a.blocks.map(b => `<span class="blockChip ${b.name ? 'filled':''}"><span class="dot"></span>${escHtml(b.label)}${b.name ? ' — ' + escHtml(b.name) : ' (vazia)'}</span>`).join('');
+  document.getElementById('blockChips').innerHTML = chips;
+  let html = '<thead><tr><th style="width:50%">Insumo</th><th>Unidade</th><th>Qtd. prevista</th></tr></thead><tbody>';
+  a.items.forEach((it, idx) => {
+    html += `<tr>
+      <td><input value="${escAttr(it.insumo)}" onchange="updateTemplateItem(${idx},'insumo',this.value)"></td>
+      <td><input value="${escAttr(it.unidade)}" onchange="updateTemplateItem(${idx},'unidade',this.value)"></td>
+      <td><input class="num" value="${numOrEmpty(it.qtd)}" onchange="updateTemplateItem(${idx},'qtd',this.value)"></td>
+    </tr>`;
+  });
+  html += '</tbody>';
+  document.getElementById('itemsPreviewTbl').innerHTML = html;
+  document.getElementById('templateSummary').classList.add('show');
+}
+
+function updateTemplateItem(idx, field, value){
+  const it = templateAnalysis.items[idx];
+  if(!it) return;
+  it[field] = field === 'qtd' ? (parseFloat(String(value).replace(',','.')) || 0) : value;
+}
+
+/* ============================= STEP 2: PDF UPLOAD ============================= */
 function setupPdfDropzone(){
   const dz = document.getElementById('dropzone');
   dz.addEventListener('click', () => document.getElementById('pdfInput').click());
@@ -248,8 +346,10 @@ function setupPdfDropzone(){
   ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); }));
   dz.addEventListener('drop', e => { handleFiles(e.dataTransfer.files); });
 }
+
 function handleFiles(fileList){
-  const files = Array.from(fileList).filter(f => f.type==='application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+  if(!templateAnalysis){ return; }
+  const files = Array.from(fileList).filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
   files.forEach(f => enqueuePdf(f));
 }
 
@@ -268,28 +368,57 @@ function processPdfQueue(){
   }
 }
 
+function normalizeName(s){
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+function autoAssignBlock(fornecedorName){
+  const norm = normalizeName(fornecedorName);
+  const words = norm.split(' ').filter(w => w.length > 2);
+  let best = null, bestScore = 0;
+  templateAnalysis.blocks.forEach((b, idx) => {
+    if(suppliers.some(s => s.assignedBlock === idx)) return; // already taken
+    if(!b.name) return;
+    const bNorm = normalizeName(b.name);
+    let score = 0;
+    words.forEach(w => { if(bNorm.indexOf(w) >= 0) score++; });
+    if(bNorm && norm.indexOf(bNorm.split(' ')[0]) >= 0) score += 2;
+    if(score > bestScore){ bestScore = score; best = idx; }
+  });
+  if(best !== null && bestScore > 0) return best;
+  // fallback: first empty-name block not yet taken
+  for(let idx = 0; idx < templateAnalysis.blocks.length; idx++){
+    if(!templateAnalysis.blocks[idx].name && !suppliers.some(s => s.assignedBlock === idx)) return idx;
+  }
+  // fallback: any block not yet taken
+  for(let idx = 0; idx < templateAnalysis.blocks.length; idx++){
+    if(!suppliers.some(s => s.assignedBlock === idx)) return idx;
+  }
+  return null;
+}
+
 async function processSupplierFile(file){
   const supplier = {
-    id: uid(), fileName: file.name, status:'loading', error:null,
+    id: uid(), fileName: file.name, status: 'loading', error: null,
     fornecedor: file.name.replace(/\.pdf$/i,''), condPagamento:'', prazoEntrega:'', frete:'',
-    itens: [], matches: {}, open:true
+    itens: [], matches: {}, assignedBlock: null, open: true
   };
   suppliers.push(supplier);
   renderSuppliers();
   try{
     const images = await pdfToImages(file);
-    if(images.length===0) throw new Error('Não consegui renderizar nenhuma página deste PDF.');
+    if(images.length === 0) throw new Error('Não consegui renderizar nenhuma página deste PDF.');
     const extracted = await extractSupplierData(images);
     supplier.fornecedor = extracted.fornecedor || supplier.fornecedor;
     supplier.condPagamento = extracted.condicao_pagamento || '';
     supplier.prazoEntrega = extracted.prazo_entrega || '';
     supplier.frete = extracted.frete || '';
     supplier.itens = Array.isArray(extracted.itens) ? extracted.itens.map(it => ({
-      codigo: it.codigo||'', descricao: it.descricao||'', unidade: it.unidade||'',
+      codigo: it.codigo || '', descricao: it.descricao || '', unidade: it.unidade || '',
       quantidade: numOrNull(it.quantidade), valorUnit: numOrNull(it.valor_unitario), valorTotal: numOrNull(it.valor_total)
     })) : [];
-    if(supplier.itens.length===0) throw new Error('Não consegui extrair itens deste orçamento.');
+    if(supplier.itens.length === 0) throw new Error('Não consegui extrair itens deste orçamento.');
     supplier.status = 'ok';
+    supplier.assignedBlock = autoAssignBlock(supplier.fornecedor);
   }catch(err){
     supplier.status = 'error';
     supplier.error = err.message || String(err);
@@ -304,7 +433,7 @@ async function pdfToImages(file, maxPages, scale){
   const pdf = await pdfjsLib.getDocument({data: buf}).promise;
   const n = Math.min(pdf.numPages, maxPages);
   const images = [];
-  for(let i=1;i<=n;i++){
+  for(let i = 1; i <= n; i++){
     const page = await pdf.getPage(i);
     const viewport = page.getViewport({scale});
     const canvas = document.createElement('canvas');
@@ -316,28 +445,29 @@ async function pdfToImages(file, maxPages, scale){
   return images;
 }
 
-/* ============================= CLAUDE API ============================= */
+/* ============================= CLAUDE API CALLS ============================= */
 async function callClaude(content, systemPrompt){
   const response = await fetch('/api/claude', {
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({model:'claude-sonnet-5', max_tokens:2000, system:systemPrompt, messages:[{role:'user', content}]})
   });
   const data = await response.json();
   if(data.error) throw new Error(data.error.message || 'Erro na API');
-  return (data.content||[]).map(b => b.type==='text'?b.text:'').join('');
+  return (data.content || []).map(b => b.type === 'text' ? b.text : '').join('');
 }
+
 function safeParseJson(raw){
   let t = raw.trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
   try{ return JSON.parse(t); }catch(e){}
-  const first=t.indexOf('{'); const last=t.lastIndexOf('}');
-  if(first>=0 && last>first){
-    let candidate = t.slice(first,last+1);
+  const first = t.indexOf('{'); const last = t.lastIndexOf('}');
+  if(first >= 0 && last > first){
+    let candidate = t.slice(first, last+1);
     try{ return JSON.parse(candidate); }catch(e){}
     let fixed = candidate.replace(/,\s*$/,'');
     const ob=(fixed.match(/{/g)||[]).length, cb=(fixed.match(/}/g)||[]).length;
     const osq=(fixed.match(/\[/g)||[]).length, csq=(fixed.match(/\]/g)||[]).length;
-    for(let i=0;i<(osq-csq);i++) fixed+=']';
-    for(let i=0;i<(ob-cb);i++) fixed+='}';
+    for(let i=0;i<(osq-csq);i++) fixed += ']';
+    for(let i=0;i<(ob-cb);i++) fixed += '}';
     try{ return JSON.parse(fixed); }catch(e){}
   }
   throw new Error('Resposta da IA não veio em JSON válido.');
@@ -356,22 +486,6 @@ async function extractSupplierData(images){
   return safeParseJson(await callClaude(content, EXTRACTION_SYSTEM));
 }
 
-const CLUSTER_SYSTEM = "Você é um especialista em materiais de construção/hidráulica. Sua tarefa é olhar itens de vários orçamentos diferentes e agrupar os que são o MESMO material e a MESMA medida/diâmetro em uma lista única e enxuta, mesmo quando a redação, marca ou abreviação variam entre fornecedores. Responda SOMENTE com JSON válido, sem markdown.";
-function buildClusterPrompt(pooledItems){
-  return 'Itens vindos de orçamentos de fornecedores diferentes (cada um com a origem indicada):\n' + JSON.stringify(pooledItems) +
-  '\n\nAgrupe os itens equivalentes (mesmo material, mesma medida/diâmetro — ignore marca/fabricante/sigla) em uma lista única e canônica, sem duplicar. Escreva uma descrição limpa e objetiva para cada grupo. Responda apenas:\n' +
-  '{"insumos": [{"descricao": "...", "unidade": "..."}]}';
-}
-async function buildCanonicalInsumos(okSuppliers){
-  const pooled = [];
-  okSuppliers.forEach((s, si) => {
-    s.itens.forEach((it, idx) => pooled.push({fornecedor: si, descricao: it.descricao, unidade: it.unidade}));
-  });
-  const raw = await callClaude([{type:'text', text: buildClusterPrompt(pooled)}], CLUSTER_SYSTEM);
-  const parsed = safeParseJson(raw);
-  return (parsed.insumos || []).map((it, idx) => ({row: idx, insumo: it.descricao, unidade: it.unidade || '', qtd: null}));
-}
-
 const MATCH_SYSTEM = "Você é um especialista em materiais de construção/hidráulica e cruza descrições de itens entre orçamentos diferentes, mesmo quando fabricantes, abreviações e formatação variam. Responda SOMENTE com JSON válido, sem markdown.";
 function buildMatchPrompt(baseList, itemList, fornecedorNome){
   return 'Lista base de insumos (row e descrição):\n' + JSON.stringify(baseList) +
@@ -379,60 +493,81 @@ function buildMatchPrompt(baseList, itemList, fornecedorNome){
   '\n\nPara CADA insumo da lista base, encontre o item do orçamento que é o MESMO material e a MESMA medida/diâmetro (ignore diferenças de marca, sigla ou abreviação). Se não houver correspondência clara e confiável, retorne item_index null. Responda apenas:\n' +
   '{"matches": [{"row": numero, "item_index": indice_ou_null, "confianca": "alta"|"media"|"baixa"}]}';
 }
-async function matchSupplierItems(supplier, items){
-  const baseList = items.map(b => ({row:b.row, descricao:b.insumo}));
-  const itemList = supplier.itens.map((it,idx) => ({index:idx, descricao:it.descricao, unidade:it.unidade}));
-  const parsed = safeParseJson(await callClaude([{type:'text', text: buildMatchPrompt(baseList,itemList,supplier.fornecedor)}], MATCH_SYSTEM));
+async function matchSupplierItems(supplier){
+  const baseList = templateAnalysis.items.map(b => ({row: b.row, descricao: b.insumo}));
+  const itemList = supplier.itens.map((it, idx) => ({index: idx, descricao: it.descricao, unidade: it.unidade}));
+  const prompt = buildMatchPrompt(baseList, itemList, supplier.fornecedor);
+  const parsed = safeParseJson(await callClaude([{type:'text', text: prompt}], MATCH_SYSTEM));
   const matches = {};
-  (parsed.matches||[]).forEach(m => {
-    if(m.item_index!==null && m.item_index!==undefined) matches[m.row] = {itemIndex:m.item_index, confidence:m.confianca||'media'};
+  (parsed.matches || []).forEach(m => {
+    if(m.item_index !== null && m.item_index !== undefined){
+      matches[m.row] = {itemIndex: m.item_index, confidence: m.confianca || 'media'};
+    }
   });
   return matches;
 }
 
 /* ============================= SUPPLIER CARDS UI ============================= */
-function toggleSupplier(id){ const s=suppliers.find(x=>x.id===id); if(s){ s.open=!s.open; renderSuppliers(); } }
+function toggleSupplier(id){ const s = suppliers.find(x=>x.id===id); if(s){ s.open=!s.open; renderSuppliers(); } }
 function removeSupplier(id){ suppliers = suppliers.filter(s=>s.id!==id); renderSuppliers(); updateButtons(); }
-function updateSupplierMeta(id, field, value){ const s=suppliers.find(x=>x.id===id); if(s) s[field]=value; }
-function updateSupplierItem(id, idx, field, value){
-  const s=suppliers.find(x=>x.id===id); if(!s) return;
-  const it=s.itens[idx]; if(!it) return;
-  if(field==='descricao'||field==='unidade'||field==='codigo') it[field]=value;
-  else it[field]=parseFloat(String(value).replace(',','.'))||0;
+function updateSupplierMeta(id, field, value){ const s = suppliers.find(x=>x.id===id); if(s) s[field]=value; }
+function updateSupplierBlock(id, value){
+  const s = suppliers.find(x=>x.id===id);
+  if(!s) return;
+  s.assignedBlock = value === '' ? null : parseInt(value,10);
+  renderSuppliers();
 }
+function updateSupplierItem(id, idx, field, value){
+  const s = suppliers.find(x=>x.id===id); if(!s) return;
+  const it = s.itens[idx]; if(!it) return;
+  if(field==='descricao'||field==='unidade'||field==='codigo') it[field]=value;
+  else it[field] = parseFloat(String(value).replace(',','.')) || 0;
+}
+
+function blockOptionsHtml(selectedIdx){
+  let html = '<option value="">— não incluir no arquivo —</option>';
+  templateAnalysis.blocks.forEach((b, idx) => {
+    const takenBy = suppliers.find(s => s.assignedBlock === idx);
+    const label = b.label + (b.name ? ' — ' + b.name : ' (vazia)');
+    html += `<option value="${idx}" ${selectedIdx===idx?'selected':''}>${escHtml(label)}</option>`;
+  });
+  return html;
+}
+
 function renderSuppliers(){
   document.getElementById('supplierCount').textContent = suppliers.length;
   const wrap = document.getElementById('suppliersWrap');
-  if(suppliers.length===0){ wrap.innerHTML=''; return; }
-  let html='';
+  if(suppliers.length === 0){ wrap.innerHTML=''; return; }
+  let html = '';
   suppliers.forEach(s => {
-    const dotClass = s.status==='loading'?'loading':(s.status==='ok'?'ok':'err');
+    const dotClass = s.status==='loading' ? 'loading' : (s.status==='ok' ? 'ok' : 'err');
     html += `<div class="supplierCard">
       <div class="sc-head" onclick="toggleSupplier('${s.id}')">
         <div class="sc-head-left">
           <span class="statusdot ${dotClass}"></span>
-          <span class="sc-title">${escHtml(s.fornecedor||s.fileName)}</span>
+          <span class="sc-title">${escHtml(s.fornecedor || s.fileName)}</span>
           <span class="sc-sub">${escHtml(s.fileName)}</span>
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
-          ${s.status==='ok' ? `<span class="sc-sub">${s.itens.length} itens</span>` : ''}
+          ${s.status==='ok' ? `<span class="sc-sub">${s.itens.length} itens${s.assignedBlock!==null ? ' · ' + escHtml(templateAnalysis.blocks[s.assignedBlock].label) : ' · sem coluna'}</span>` : ''}
           ${s.status==='loading' ? '<span class="sc-sub">Lendo documento…</span>' : ''}
           <button class="small" onclick="event.stopPropagation(); removeSupplier('${s.id}')">Remover</button>
         </div>
       </div>
       <div class="sc-body ${s.open?'open':''}">`;
     if(s.status==='error'){
-      html += `<div class="errbanner">Falha ao ler este orçamento: ${escHtml(s.error)}. Remova e reenvie o arquivo.</div>`;
+      html += `<div class="errbanner">Falha ao ler este orçamento: ${escHtml(s.error)}. Remova e reenvie o arquivo, ou preencha manualmente.</div>`;
     }
     html += `<div class="metaGrid">
         <div><label>Fornecedor</label><input value="${escAttr(s.fornecedor)}" onchange="updateSupplierMeta('${s.id}','fornecedor',this.value)"></div>
         <div><label>Condição de pagamento</label><input value="${escAttr(s.condPagamento)}" onchange="updateSupplierMeta('${s.id}','condPagamento',this.value)"></div>
         <div><label>Prazo de entrega</label><input value="${escAttr(s.prazoEntrega)}" onchange="updateSupplierMeta('${s.id}','prazoEntrega',this.value)"></div>
         <div><label>Frete</label><input value="${escAttr(s.frete)}" onchange="updateSupplierMeta('${s.id}','frete',this.value)"></div>
+        <div class="assignBox"><label>Coluna no modelo</label><select onchange="updateSupplierBlock('${s.id}',this.value)">${blockOptionsHtml(s.assignedBlock)}</select></div>
       </div>`;
     if(s.itens && s.itens.length){
       html += '<table class="itemsTbl"><thead><tr><th>Código</th><th>Descrição</th><th>Un.</th><th>Qtd</th><th>Vlr. Unit.</th><th>Vlr. Total</th></tr></thead><tbody>';
-      s.itens.forEach((it,idx) => {
+      s.itens.forEach((it, idx) => {
         html += `<tr>
           <td><input value="${escAttr(it.codigo)}" onchange="updateSupplierItem('${s.id}',${idx},'codigo',this.value)" style="width:70px"></td>
           <td><input value="${escAttr(it.descricao)}" onchange="updateSupplierItem('${s.id}',${idx},'descricao',this.value)" style="min-width:220px"></td>
@@ -450,78 +585,35 @@ function renderSuppliers(){
   updateButtons();
 }
 
-/* ============================= STEP 2: COMPARISON ============================= */
+/* ============================= STEP 3: COMPARISON ============================= */
 function updateButtons(){
-  const okSuppliers = suppliers.filter(s=>s.status==='ok');
-  document.getElementById('btnGenerate').disabled = okSuppliers.length===0;
-  document.getElementById('cardComp').classList.toggle('disabled', okSuppliers.length===0);
-}
-
-function mode(arr){
-  const counts = {};
-  let best=null, bestCount=0;
-  arr.forEach(v => {
-    if(v===null||v===undefined) return;
-    counts[v] = (counts[v]||0)+1;
-    if(counts[v]>bestCount){ bestCount=counts[v]; best=v; }
-  });
-  return best;
+  const okSuppliers = suppliers.filter(s => s.status==='ok');
+  const canGenerate = !!(templateAnalysis && okSuppliers.length > 0);
+  document.getElementById('btnGenerate').disabled = !canGenerate;
+  document.getElementById('cardComp').classList.toggle('disabled', !templateAnalysis);
 }
 
 async function generateComparison(){
-  const okSuppliers = suppliers.filter(s=>s.status==='ok');
-  if(okSuppliers.length===0) return;
+  const okSuppliers = suppliers.filter(s => s.status==='ok');
+  if(!templateAnalysis || okSuppliers.length===0) return;
   const progress = document.getElementById('progressWrap');
   document.getElementById('btnGenerate').disabled = true;
   document.getElementById('btnExport').disabled = true;
   progress.innerHTML = '';
-
-  let items;
-  if(baseItems){
-    items = baseItems.map(it => ({row:it.row, insumo:it.insumo, unidade:it.unidade, qtd:it.qtd}));
-    progress.innerHTML = '<div class="progressLine">Usando a lista de insumos importada.</div>';
-  } else {
-    progress.innerHTML = '<div class="progressLine">Montando a lista de insumos a partir dos orçamentos…</div>';
-    try{
-      items = await buildCanonicalInsumos(okSuppliers);
-    }catch(err){
-      progress.innerHTML += `<div class="errbanner">Não consegui montar a lista automática (${escHtml(err.message)}). Tente novamente ou importe uma lista manualmente.</div>`;
-      document.getElementById('btnGenerate').disabled = false;
-      return;
-    }
-    if(items.length===0){
-      progress.innerHTML += '<div class="errbanner">Não encontrei itens para comparar.</div>';
-      document.getElementById('btnGenerate').disabled = false;
-      return;
-    }
-  }
-
   for(let i=0;i<okSuppliers.length;i++){
     const s = okSuppliers[i];
-    progress.innerHTML += `<div class="progressLine">Comparando itens de "${escHtml(s.fornecedor)}"… (${i+1}/${okSuppliers.length})</div>`;
+    progress.innerHTML = `<div class="progressLine">Comparando itens de "${escHtml(s.fornecedor)}"… (${i+1}/${okSuppliers.length})</div>`;
     try{
-      s.matches = await matchSupplierItems(s, items);
+      s.matches = await matchSupplierItems(s);
     }catch(err){
       s.matches = {};
       progress.innerHTML += `<div class="warnbanner">Não consegui cruzar automaticamente os itens de "${escHtml(s.fornecedor)}" (${escHtml(err.message)}). Selecione manualmente na tabela.</div>`;
     }
   }
-
-  // fill in quantity per item (mode of matched supplier quantities) if not already set
-  items.forEach(it => {
-    if(it.qtd !== null && it.qtd !== undefined) return;
-    const qtys = [];
-    okSuppliers.forEach(s => {
-      const m = s.matches[it.row];
-      if(m && m.itemIndex!==null && m.itemIndex!==undefined){
-        const raw = s.itens[m.itemIndex];
-        if(raw && raw.quantidade!==null && raw.quantidade!==undefined) qtys.push(raw.quantidade);
-      }
-    });
-    it.qtd = qtys.length ? mode(qtys) : null;
-  });
-
-  derivedItems = items;
+  const unassigned = okSuppliers.filter(s => s.assignedBlock === null);
+  if(unassigned.length){
+    progress.innerHTML += `<div class="warnbanner">${unassigned.length} fornecedor(es) sem coluna livre no modelo: ${unassigned.map(s=>escHtml(s.fornecedor)).join(', ')}. Ajuste manualmente em "Coluna no modelo" ou eles ficarão de fora do arquivo final.</div>`;
+  }
   progress.innerHTML += '<div class="progressLine">Comparativo pronto — revise abaixo antes de baixar.</div>';
   renderComparisonTable();
   document.getElementById('btnGenerate').disabled = false;
@@ -537,58 +629,52 @@ function getSupplierValueForRow(supplier, row){
 }
 function setManualMatch(supplierId, row, itemIndexStr){
   const s = suppliers.find(x=>x.id===supplierId); if(!s) return;
-  if(itemIndexStr==='') delete s.matches[row];
+  if(itemIndexStr==='' ) delete s.matches[row];
   else s.matches[row] = {itemIndex: parseInt(itemIndexStr,10), confidence:'manual'};
   renderComparisonTable();
 }
 function setManualCell(supplierId, row, field, value){
   const s = suppliers.find(x=>x.id===supplierId); if(!s) return;
   const m = s.matches[row];
-  const num = parseFloat(String(value).replace(',','.'))||0;
+  const num = parseFloat(String(value).replace(',','.')) || 0;
   if(m && m.itemIndex!==null && m.itemIndex!==undefined && s.itens[m.itemIndex]){
-    if(field==='unit') s.itens[m.itemIndex].valorUnit=num; else s.itens[m.itemIndex].valorTotal=num;
+    if(field==='unit') s.itens[m.itemIndex].valorUnit = num; else s.itens[m.itemIndex].valorTotal = num;
   }else{
     s.itens.push({codigo:'', descricao:'(valor manual)', unidade:'', quantidade:null, valorUnit: field==='unit'?num:0, valorTotal: field==='total'?num:0});
     s.matches[row] = {itemIndex: s.itens.length-1, confidence:'manual'};
   }
   renderComparisonTable();
 }
-function updateDerivedItem(idx, field, value){
-  const it = derivedItems[idx]; if(!it) return;
-  if(field==='qtd') it.qtd = parseFloat(String(value).replace(',','.'))||0;
-  else it[field] = value;
-  renderComparisonTable();
-}
 
 function renderComparisonTable(){
-  const okSuppliers = suppliers.filter(s=>s.status==='ok');
+  const okSuppliers = suppliers.filter(s => s.status==='ok' && s.assignedBlock!==null);
   const wrap = document.getElementById('compWrap');
-  if(!derivedItems || okSuppliers.length===0){ wrap.innerHTML=''; return; }
+  if(!templateAnalysis || okSuppliers.length===0){ wrap.innerHTML=''; return; }
 
   let thead = '<thead><tr><th rowspan="2">Insumo</th><th rowspan="2">Un.</th><th rowspan="2">Qtd.</th>';
   okSuppliers.forEach(s => { thead += `<th colspan="2">${escHtml(s.fornecedor)}</th>`; });
   thead += '<th colspan="3">Melhor preço</th></tr><tr class="sub">';
-  okSuppliers.forEach(()=>{ thead += '<th>Unit.</th><th>Total</th>'; });
+  okSuppliers.forEach(() => { thead += '<th>Unit.</th><th>Total</th>'; });
   thead += '<th>Unit.</th><th>Total</th><th>Fornecedor</th></tr></thead>';
 
   let tbody = '<tbody>';
   const totalsPerSupplier = okSuppliers.map(()=>0);
   let bestGrandTotal = 0;
 
-  derivedItems.forEach((b, bidx) => {
-    let rowBest = null, rowCells = '';
-    okSuppliers.forEach(s => {
+  templateAnalysis.items.forEach(b => {
+    let rowBest = null;
+    let rowCells = '';
+    okSuppliers.forEach((s, si) => {
       const val = getSupplierValueForRow(s, b.row);
       const unit = val ? val.unit : null;
-      const total = val ? (val.total!==null && val.total!==undefined ? val.total : (unit!==null && b.qtd ? unit*b.qtd : null)) : null;
-      if(unit!==null && unit!==undefined){
-        const si = okSuppliers.indexOf(s);
-        totalsPerSupplier[si] += (total||0);
-        if(rowBest===null || unit<rowBest.unit) rowBest = {unit, total: total||0, fornecedor: s.fornecedor};
+      const total = val ? (val.total !== null && val.total !== undefined ? val.total : (unit!==null && b.qtd ? unit*b.qtd : null)) : null;
+      if(unit !== null && unit !== undefined){
+        totalsPerSupplier[si] += (total || 0);
+        if(rowBest === null || unit < rowBest.unit) rowBest = {unit, total: total||0, fornecedor: s.fornecedor};
       }
       const confBadge = val && val.confidence ? `<div class="conf ${val.confidence}">${val.confidence}</div>` : '';
       const options = ['<option value="">— sem correspondência —</option>']
-        .concat(s.itens.map((it,idx)=>`<option value="${idx}" ${val&&val.itemIndex===idx?'selected':''}>${escHtml(it.descricao)} (R$ ${fmtNum(it.valorUnit)})</option>`));
+        .concat(s.itens.map((it,idx)=>`<option value="${idx}" ${val && val.itemIndex===idx?'selected':''}>${escHtml(it.descricao)} (R$ ${fmtNum(it.valorUnit)})</option>`));
       rowCells += `<td class="num">
           <input class="cellnum" value="${unit===null?'':unit}" onchange="setManualCell('${s.id}',${b.row},'unit',this.value)">
           ${confBadge}
@@ -598,9 +684,9 @@ function renderComparisonTable(){
     });
     if(rowBest) bestGrandTotal += rowBest.total;
     tbody += `<tr>
-      <td class="insumo"><input value="${escAttr(b.insumo)}" onchange="updateDerivedItem(${bidx},'insumo',this.value)" style="font-weight:600; width:100%; border:none; background:transparent;"></td>
-      <td><input value="${escAttr(b.unidade)}" onchange="updateDerivedItem(${bidx},'unidade',this.value)" style="width:56px; border:none; background:transparent;"></td>
-      <td class="num"><input class="cellnum" value="${numOrEmpty(b.qtd)}" onchange="updateDerivedItem(${bidx},'qtd',this.value)"></td>
+      <td class="insumo">${escHtml(b.insumo)}</td>
+      <td>${escHtml(b.unidade)}</td>
+      <td class="num">${numOrEmpty(b.qtd)}</td>
       ${rowCells}
       <td class="num best">${rowBest?fmtNum(rowBest.unit):'—'}</td>
       <td class="num best">${rowBest?fmtNum(rowBest.total):'—'}</td>
@@ -616,206 +702,116 @@ function renderComparisonTable(){
   wrap.innerHTML = `<div class="compWrap"><table class="compTbl">${thead}${tbody}${totalRow}</table></div>`;
 }
 
-/* ============================= EXPORT: BUILD XLSX FROM SCRATCH ============================= */
-function colLetter(n){
-  let s=''; n=n+1;
-  while(n>0){ let rem=(n-1)%26; s=String.fromCharCode(65+rem)+s; n=Math.floor((n-1)/26); }
-  return s;
-}
+/* ============================= EXPORT: SURGICAL XLSX PATCH ============================= */
 function xmlEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-const XSTYLE = { TITLE:1, HEADER:2, NORMAL_TEXT:0, NORMAL_NUM:4, BEST_NUM:5, BEST_TEXT:6, TOTAL_LABEL:7, TOTAL_NUM:8, COND_LABEL:9, COND_TEXT:10 };
-
-const STYLES_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-'<numFmts count="1"><numFmt numFmtId="164" formatCode="0.00"/></numFmts>' +
-'<fonts count="5">' +
-'<font><sz val="11"/><name val="Calibri"/></font>' +
-'<font><b/><sz val="18"/><name val="Calibri"/><color rgb="FF1E2A28"/></font>' +
-'<font><b/><sz val="10"/><name val="Calibri"/><color rgb="FFFBFBF8"/></font>' +
-'<font><b/><sz val="10"/><name val="Calibri"/><color rgb="FF1E2A28"/></font>' +
-'<font><b/><sz val="11"/><name val="Calibri"/><color rgb="FF2A1A03"/></font>' +
-'</fonts>' +
-'<fills count="5">' +
-'<fill><patternFill patternType="none"/></fill>' +
-'<fill><patternFill patternType="gray125"/></fill>' +
-'<fill><patternFill patternType="solid"><fgColor rgb="FF1E2A28"/><bgColor indexed="64"/></patternFill></fill>' +
-'<fill><patternFill patternType="solid"><fgColor rgb="FFE3E6DC"/><bgColor indexed="64"/></patternFill></fill>' +
-'<fill><patternFill patternType="solid"><fgColor rgb="FFFBE9C9"/><bgColor indexed="64"/></patternFill></fill>' +
-'</fills>' +
-'<borders count="2">' +
-'<border><left/><right/><top/><bottom/><diagonal/></border>' +
-'<border><left style="thin"><color rgb="FFC7CCC0"/></left><right style="thin"><color rgb="FFC7CCC0"/></right><top style="thin"><color rgb="FFC7CCC0"/></top><bottom style="thin"><color rgb="FFC7CCC0"/></bottom><diagonal/></border>' +
-'</borders>' +
-'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-'<cellXfs count="11">' +
-'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>' +
-'<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0"/>' +
-'<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' +
-'<xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>' +
-'<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>' +
-'<xf numFmtId="164" fontId="4" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>' +
-'<xf numFmtId="0" fontId="4" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>' +
-'<xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>' +
-'<xf numFmtId="164" fontId="3" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>' +
-'<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1"/>' +
-'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>' +
-'</cellXfs>' +
-'</styleSheet>';
-
-function cellNumXml(ref, style, value){
-  if(value===null||value===undefined||value==='') return `<c r="${ref}" s="${style}"/>`;
-  return `<c r="${ref}" s="${style}"><v>${value}</v></c>`;
+function setCellInRowXml(rowXml, colLetter, rowNum1based, type, value){
+  const ref = colLetter + rowNum1based;
+  const reSelf = new RegExp('<c r="' + ref + '"([^>]*)/>');
+  const reFull = new RegExp('<c r="' + ref + '"([^>]*)>([\\s\\S]*?)</c>');
+  function stripT(attrs){ return attrs.replace(/\st="[^"]*"/,''); }
+  function buildNumber(attrs){ return `<c r="${ref}"${stripT(attrs)}><v>${value}</v></c>`; }
+  function buildString(attrs){ return `<c r="${ref}"${stripT(attrs)} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(value)}</t></is></c>`; }
+  const build = type === 'number' ? buildNumber : buildString;
+  if(reSelf.test(rowXml)) return rowXml.replace(reSelf, (m, attrs) => build(attrs));
+  if(reFull.test(rowXml)) return rowXml.replace(reFull, (m, attrs) => build(attrs));
+  return rowXml; // cell not found — silently skip (shouldn't happen with a well-formed template)
 }
-function cellStrXml(ref, style, value){
-  if(value===null||value===undefined||value==='') return `<c r="${ref}" s="${style}"/>`;
-  return `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(value)}</t></is></c>`;
-}
-function buildSheetXml(rows, dims){
-  let body = rows.map(row => {
-    const cellsXml = row.cells.map(c => {
-      const ref = colLetter(c.col) + row.r;
-      return c.type==='n' ? cellNumXml(ref,c.style,c.value) : cellStrXml(ref,c.style,c.value);
-    }).join('');
-    return `<row r="${row.r}" spans="1:${dims.maxCol+1}">${cellsXml}</row>`;
-  }).join('');
-  const colsXml = dims.cols.map(c => `<col min="${c.min}" max="${c.max}" width="${c.width}" customWidth="1"/>`).join('');
-  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-  '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-  `<dimension ref="A1:${colLetter(dims.maxCol)}${dims.maxRow}"/>` +
-  '<sheetViews><sheetView tabSelected="1" workbookViewId="0"><pane ySplit="2" topLeftCell="A3" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' +
-  '<sheetFormatPr defaultRowHeight="15"/>' +
-  `<cols>${colsXml}</cols>` +
-  `<sheetData>${body}</sheetData>` +
-  '</worksheet>';
-}
-const WORKBOOK_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
-'<sheets><sheet name="Mapa de Cotação" sheetId="1" r:id="rId1"/></sheets>' +
-'<calcPr fullCalcOnLoad="1"/>' +
-'</workbook>';
-const WORKBOOK_RELS = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
-'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
-'</Relationships>';
-const ROOT_RELS = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
-'</Relationships>';
-const CONTENT_TYPES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
-'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
-'<Default Extension="xml" ContentType="application/xml"/>' +
-'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
-'<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
-'<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
-'</Types>';
 
-async function exportWorkbook(){
-  const okSuppliers = suppliers.filter(s=>s.status==='ok');
-  if(!derivedItems || okSuppliers.length===0) return;
+function patchSheetXml(xml, patches){
+  const byRow = {};
+  patches.forEach(p => { (byRow[p.row] = byRow[p.row] || []).push(p); });
+  Object.keys(byRow).forEach(rowNum => {
+    const reRow = new RegExp('<row r="' + rowNum + '"([^>]*)>([\\s\\S]*?)</row>');
+    const m = xml.match(reRow);
+    if(!m) return;
+    let rowInner = m[0];
+    byRow[rowNum].forEach(p => { rowInner = setCellInRowXml(rowInner, p.col, rowNum, p.type, p.value); });
+    xml = xml.replace(m[0], rowInner);
+  });
+  return xml;
+}
+
+function getAttr(tag, attr){
+  const m = tag.match(new RegExp(attr.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '="([^"]*)"'));
+  return m ? m[1] : null;
+}
+
+async function exportPatchedXlsx(){
+  const okSuppliers = suppliers.filter(s => s.status==='ok' && s.assignedBlock!==null);
+  if(!templateBuffer || !templateAnalysis || okSuppliers.length===0) return;
+
   const progress = document.getElementById('progressWrap');
+  progress.innerHTML = '<div class="progressLine">Montando o arquivo final…</div>';
   try{
-    const rows = [];
-    rows.push({r:1, cells:[{col:0,type:'s',style:XSTYLE.TITLE,value:'MAPA DE COTAÇÃO'}]});
+    const zip = await JSZip.loadAsync(templateBuffer.slice(0));
+    const wbXmlPath = 'xl/workbook.xml';
+    const wbXml = await zip.file(wbXmlPath).async('string');
 
-    let headerCells = [
-      {col:0,type:'s',style:XSTYLE.HEADER,value:'Insumo'},
-      {col:1,type:'s',style:XSTYLE.HEADER,value:'Unidade'},
-      {col:2,type:'s',style:XSTYLE.HEADER,value:'Qtd. prevista'}
-    ];
-    let col = 3;
+    const sheetTags = wbXml.match(/<sheet\b[^>]*\/>/g) || [];
+    const sheetTag = sheetTags.find(t => getAttr(t,'name') === templateAnalysis.sheetName);
+    if(!sheetTag) throw new Error('Não consegui localizar a planilha dentro do arquivo original.');
+    const rId = getAttr(sheetTag, 'r:id');
+    if(!rId) throw new Error('Não consegui localizar o identificador da planilha dentro do arquivo original.');
+
+    const relsXml = await zip.file('xl/_rels/workbook.xml.rels').async('string');
+    const relTags = relsXml.match(/<Relationship\b[^>]*\/>/g) || [];
+    const relTag = relTags.find(t => getAttr(t,'Id') === rId);
+    if(!relTag) throw new Error('Não consegui localizar o caminho da planilha dentro do arquivo original.');
+    let target = getAttr(relTag, 'Target');
+    if(!target) throw new Error('Não consegui localizar o caminho da planilha dentro do arquivo original.');
+    target = target.replace(/^\//,'');
+    if(!target.startsWith('xl/')) target = 'xl/' + target;
+
+    let sheetXml = await zip.file(target).async('string');
+
+    const patches = [];
     okSuppliers.forEach(s => {
-      headerCells.push({col:col,type:'s',style:XSTYLE.HEADER,value:s.fornecedor+' — Vlr. Unit.'});
-      headerCells.push({col:col+1,type:'s',style:XSTYLE.HEADER,value:s.fornecedor+' — Vlr. Total'});
-      col += 2;
-    });
-    headerCells.push({col:col,type:'s',style:XSTYLE.HEADER,value:'Melhor Preço — Unit.'});
-    headerCells.push({col:col+1,type:'s',style:XSTYLE.HEADER,value:'Melhor Preço — Total'});
-    headerCells.push({col:col+2,type:'s',style:XSTYLE.HEADER,value:'Melhor Preço — Fornecedor'});
-    const maxCol = col+2;
-    rows.push({r:2, cells: headerCells});
-
-    const totalsPerSupplier = okSuppliers.map(()=>0);
-    let bestGrandTotal = 0;
-    const FIRST_ROW = 3;
-
-    derivedItems.forEach((it, i) => {
-      const r = FIRST_ROW + i;
-      let cells = [
-        {col:0,type:'s',style:XSTYLE.NORMAL_TEXT,value:it.insumo},
-        {col:1,type:'s',style:XSTYLE.NORMAL_TEXT,value:it.unidade},
-        {col:2,type:'n',style:XSTYLE.NORMAL_NUM,value:it.qtd}
-      ];
-      let c = 3, best = null;
-      okSuppliers.forEach((s, si) => {
+      const block = templateAnalysis.blocks[s.assignedBlock];
+      const unitColLetter = XLSX.utils.encode_col(block.unitCol);
+      const totalColLetter = XLSX.utils.encode_col(block.totalCol);
+      templateAnalysis.items.forEach(it => {
         const val = getSupplierValueForRow(s, it.row);
-        const unit = val ? val.unit : null;
-        const total = val ? (val.total!==null && val.total!==undefined ? val.total : (unit!==null && it.qtd ? unit*it.qtd : null)) : null;
-        if(unit!==null && unit!==undefined){
-          totalsPerSupplier[si] += (total||0);
-          if(best===null || unit<best.unit) best = {unit, total: total||0, fornecedor: s.fornecedor};
+        if(val && val.unit !== null && val.unit !== undefined){
+          patches.push({row: it.row+1, col: unitColLetter, type:'number', value: val.unit});
         }
-        cells.push({col:c,type:'n',style:XSTYLE.NORMAL_NUM,value:unit});
-        cells.push({col:c+1,type:'n',style:XSTYLE.NORMAL_NUM,value:total});
-        c += 2;
       });
-      if(best) bestGrandTotal += best.total;
-      cells.push({col:c,type:'n',style:XSTYLE.BEST_NUM,value: best?best.unit:null});
-      cells.push({col:c+1,type:'n',style:XSTYLE.BEST_NUM,value: best?best.total:null});
-      cells.push({col:c+2,type:'s',style:XSTYLE.BEST_TEXT,value: best?best.fornecedor:''});
-      rows.push({r, cells});
+      if(!block.name && s.fornecedor){
+        patches.push({row: block.nameRow+1, col: unitColLetter, type:'string', value: s.fornecedor});
+      }
+      if(block.condRow !== undefined && s.condPagamento){
+        patches.push({row: block.condRow+1, col: totalColLetter, type:'string', value: s.condPagamento});
+      }
+      if(block.prazoRow !== undefined && s.prazoEntrega){
+        patches.push({row: block.prazoRow+1, col: totalColLetter, type:'string', value: s.prazoEntrega});
+      }
+      if(block.freteRow !== undefined && s.frete){
+        patches.push({row: block.freteRow+1, col: totalColLetter, type:'string', value: s.frete});
+      }
     });
 
-    const totalRowNum = FIRST_ROW + derivedItems.length;
-    let totalCells = [
-      {col:0,type:'s',style:XSTYLE.TOTAL_LABEL,value:'TOTAL'},
-      {col:1,type:'s',style:XSTYLE.TOTAL_LABEL,value:''},
-      {col:2,type:'s',style:XSTYLE.TOTAL_LABEL,value:''}
-    ];
-    let c2 = 3;
-    okSuppliers.forEach((s,si) => {
-      totalCells.push({col:c2,type:'s',style:XSTYLE.TOTAL_LABEL,value:''});
-      totalCells.push({col:c2+1,type:'n',style:XSTYLE.TOTAL_NUM,value: totalsPerSupplier[si]});
-      c2 += 2;
-    });
-    totalCells.push({col:c2,type:'s',style:XSTYLE.TOTAL_LABEL,value:''});
-    totalCells.push({col:c2+1,type:'n',style:XSTYLE.TOTAL_NUM,value: bestGrandTotal});
-    totalCells.push({col:c2+2,type:'s',style:XSTYLE.TOTAL_LABEL,value:''});
-    rows.push({r: totalRowNum, cells: totalCells});
+    sheetXml = patchSheetXml(sheetXml, patches);
+    zip.file(target, sheetXml);
 
-    function condRow(rNum, label, values){
-      let cells = [{col:0,type:'s',style:XSTYLE.COND_LABEL,value:label},{col:1,type:'s',style:XSTYLE.COND_LABEL,value:''},{col:2,type:'s',style:XSTYLE.COND_LABEL,value:''}];
-      let c = 3;
-      okSuppliers.forEach((s,si) => {
-        cells.push({col:c,type:'s',style:XSTYLE.COND_LABEL,value:''});
-        cells.push({col:c+1,type:'s',style:XSTYLE.COND_TEXT,value: values[si]||''});
-        c += 2;
-      });
-      rows.push({r:rNum, cells});
+    let newWbXml = wbXml.replace(/<calcPr[^\/]*\/>/, m => {
+      if(/fullCalcOnLoad/.test(m)) return m;
+      return m.replace('/>', ' fullCalcOnLoad="1"/>');
+    });
+    if(newWbXml === wbXml && !/<calcPr/.test(wbXml)){
+      newWbXml = wbXml.replace('</workbook>', '<calcPr fullCalcOnLoad="1"/></workbook>');
     }
-    condRow(totalRowNum+1, 'Condição de pagamento', okSuppliers.map(s=>s.condPagamento));
-    condRow(totalRowNum+2, 'Prazo de entrega', okSuppliers.map(s=>s.prazoEntrega));
-    condRow(totalRowNum+3, 'Frete', okSuppliers.map(s=>s.frete));
-
-    const dims = { maxCol, maxRow: totalRowNum+3, cols: [{min:1,max:1,width:42},{min:2,max:2,width:12},{min:3,max:3,width:14}] };
-
-    const zip = new JSZip();
-    zip.file('[Content_Types].xml', CONTENT_TYPES);
-    zip.file('_rels/.rels', ROOT_RELS);
-    zip.file('xl/workbook.xml', WORKBOOK_XML);
-    zip.file('xl/_rels/workbook.xml.rels', WORKBOOK_RELS);
-    zip.file('xl/styles.xml', STYLES_XML);
-    zip.file('xl/worksheets/sheet1.xml', buildSheetXml(rows, dims));
+    zip.file(wbXmlPath, newWbXml);
 
     const outBlob = await zip.generateAsync({type:'blob'});
     const a = document.createElement('a');
     const url = URL.createObjectURL(outBlob);
-    a.href = url; a.download = 'mapa_de_cotacao.xlsx';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    a.href = url;
+    a.download = 'preenchido_mapa_cotacao.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    progress.innerHTML += '<div class="okbanner">Arquivo baixado.</div>';
+    progress.innerHTML += '<div class="okbanner">Arquivo baixado. Abra no Excel — as colunas de melhor preço e totais recalculam sozinhas.</div>';
   }catch(err){
     progress.innerHTML += `<div class="errbanner">Não consegui gerar o arquivo final: ${escHtml(err.message)}.</div>`;
   }
