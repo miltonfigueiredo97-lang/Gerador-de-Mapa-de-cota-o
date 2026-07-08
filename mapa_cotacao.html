@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa de Cotação — Automático</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --paper:#EEF0EA; --paper-2:#E3E6DC; --ink:#1E2A28; --ink-soft:#4B5A56; --line:#C7CCC0; --line-strong:#9AA396;
+    --amber:#E8A33D; --amber-deep:#B87A1E; --teal:#2B6F77; --teal-deep:#1D4E54; --brick:#B54834; --white:#FBFBF8;
+    --mono:'IBM Plex Mono', Consolas, monospace; --sans:'Inter',-apple-system,'Segoe UI',sans-serif; --disp:'Archivo','Inter',sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--sans); min-height:100vh;}
+  .ruler{height:14px; width:100%; background-image:repeating-linear-gradient(90deg, var(--line-strong) 0 1px, transparent 1px 24px); opacity:.55;}
+  header.top{padding:34px 5vw 22px; border-bottom:2px solid var(--ink); display:flex; justify-content:space-between; align-items:flex-end; gap:24px; flex-wrap:wrap;}
+  .brandblock{max-width:760px;}
+  .eyebrow{font-family:var(--mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--teal-deep); font-weight:600; margin-bottom:6px;}
+  h1{font-family:var(--disp); font-weight:800; font-size:34px; margin:0 0 8px; letter-spacing:-.01em;}
+  .lede{color:var(--ink-soft); font-size:15px; line-height:1.5; margin:0;}
+  button, .btn{font-family:var(--sans); font-weight:600; font-size:13.5px; border-radius:3px; border:2px solid var(--ink); padding:11px 18px; cursor:pointer; background:var(--white); color:var(--ink); transition:transform .08s ease;}
+  button:hover:not(:disabled){transform:translateY(-1px);}
+  button:disabled{opacity:.4; cursor:not-allowed; transform:none;}
+  button.primary{background:var(--ink); color:var(--paper);}
+  button.amber{background:var(--amber); border-color:var(--amber-deep); color:#2A1A03;}
+  button.ghost{background:transparent;}
+  button.small{padding:6px 11px; font-size:12px; border-width:1.5px;}
+  main{padding:30px 5vw 90px; max-width:1500px; margin:0 auto;}
+  section.card{background:var(--white); border:1.5px solid var(--ink); border-radius:4px; margin-bottom:28px; box-shadow:4px 4px 0 rgba(30,42,40,.06);}
+  section.card.disabled{opacity:.5; pointer-events:none;}
+  .card-head{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 22px; border-bottom:1.5px solid var(--line); flex-wrap:wrap;}
+  .card-head h2{font-family:var(--disp); font-size:16px; margin:0; letter-spacing:.02em; text-transform:uppercase; display:flex; align-items:center; gap:10px;}
+  .stepnum{width:24px; height:24px; border-radius:50%; background:var(--ink); color:var(--paper); font-family:var(--mono); font-size:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .card-body{padding:20px 22px 24px;}
+  .hint{color:var(--ink-soft); font-size:13px; margin:0 0 14px; line-height:1.5;}
+  .dropzone{border:2.5px dashed var(--line-strong); border-radius:6px; padding:30px 20px; text-align:center; cursor:pointer; transition:.15s; background:var(--paper);}
+  .dropzone.drag{border-color:var(--teal); background:#E4EFEF;}
+  .dropzone .dz-icon{font-size:26px; margin-bottom:8px;}
+  .dropzone .dz-title{font-weight:700; font-size:14.5px;}
+  .dropzone .dz-sub{color:var(--ink-soft); font-size:12.5px; margin-top:4px;}
+  .badgeCount{font-family:var(--mono); font-size:11px; background:var(--ink); color:var(--paper); border-radius:10px; padding:1px 8px;}
+  .supplierCard{border:1.5px solid var(--line-strong); border-radius:5px; margin-top:14px; overflow:hidden;}
+  .supplierCard .sc-head{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; background:var(--paper-2); cursor:pointer; flex-wrap:wrap;}
+  .sc-head-left{display:flex; align-items:center; gap:10px; min-width:0;}
+  .statusdot{width:9px; height:9px; border-radius:50%; flex-shrink:0;}
+  .statusdot.loading{background:var(--amber); animation:pulse 1s infinite;}
+  .statusdot.ok{background:#3F7D57;} .statusdot.err{background:var(--brick);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .sc-title{font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .sc-sub{font-family:var(--mono); font-size:11.5px; color:var(--ink-soft);}
+  .sc-body{padding:14px 16px 18px; border-top:1.5px solid var(--line-strong); display:none; background:var(--white);}
+  .sc-body.open{display:block;}
+  .metaGrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:14px;}
+  .metaGrid label{display:block; font-family:var(--mono); font-size:10.5px; text-transform:uppercase; color:var(--ink-soft); margin-bottom:3px; letter-spacing:.05em;}
+  .metaGrid input{width:100%; padding:7px 8px; border:1px solid var(--line-strong); border-radius:3px; font-size:13px; font-family:var(--sans); background:var(--white);}
+  table.itemsTbl, table.baseTbl{width:100%; border-collapse:collapse; font-size:12.5px;}
+  table.itemsTbl th, table.baseTbl th{text-align:left; font-family:var(--mono); font-size:10.5px; text-transform:uppercase; color:var(--ink-soft); border-bottom:1px solid var(--ink); padding:6px 6px;}
+  table.itemsTbl td, table.baseTbl td{padding:4px 6px; border-bottom:1px solid var(--line);}
+  table.itemsTbl input, table.baseTbl input{width:100%; border:none; background:transparent; font-family:var(--sans); font-size:12.5px; padding:3px 4px; border-radius:2px;}
+  table.itemsTbl input:hover, table.baseTbl input:hover{background:var(--paper);}
+  table.itemsTbl input:focus, table.baseTbl input:focus{outline:none; background:var(--white); box-shadow:inset 0 0 0 1.5px var(--teal);}
+  table.itemsTbl input.num, table.baseTbl input.num{font-family:var(--mono); text-align:right;}
+  .rowactions button{padding:3px 8px; font-size:11px;}
+  .errbanner{background:#FBE8E2; border:1.5px solid var(--brick); color:#6E2717; padding:10px 14px; border-radius:4px; font-size:13px; margin-top:10px;}
+  .warnbanner{background:#FCF1DC; border:1.5px solid var(--amber-deep); color:#5C3B0A; padding:10px 14px; border-radius:4px; font-size:13px; margin-top:10px;}
+  .okbanner{background:#E4F0E6; border:1.5px solid #3F7D57; color:#1E4A2C; padding:10px 14px; border-radius:4px; font-size:13px; margin-top:10px;}
+  .compWrap{overflow-x:auto; border:1px solid var(--line-strong); border-radius:4px;}
+  table.compTbl{border-collapse:collapse; font-size:12.5px; min-width:900px; width:100%;}
+  table.compTbl th, table.compTbl td{border:1px solid var(--line); padding:6px 8px; white-space:nowrap;}
+  table.compTbl thead th{position:sticky; top:0; background:var(--ink); color:var(--paper); font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; z-index:2;}
+  table.compTbl thead tr.sub th{background:var(--teal-deep); top:29px;}
+  table.compTbl td.insumo{white-space:normal; min-width:220px; font-weight:600;}
+  table.compTbl td.num{font-family:var(--mono); text-align:right;}
+  table.compTbl td.best{background:#FBE9C9; font-weight:700;}
+  table.compTbl td.best::after{content:"★"; color:var(--amber-deep); margin-left:4px; font-size:10px;}
+  table.compTbl input.cellnum{width:82px; border:1px solid transparent; background:transparent; font-family:var(--mono); font-size:12.5px; text-align:right; padding:3px 4px; border-radius:2px;}
+  table.compTbl input.cellnum:hover{border-color:var(--line-strong);}
+  table.compTbl input.cellnum:focus{outline:none; border-color:var(--teal); background:var(--white);}
+  select.matchSel{font-family:var(--sans); font-size:11px; max-width:150px; border:1px solid var(--line-strong); border-radius:2px; padding:2px; margin-top:2px; background:var(--white);}
+  .conf{font-size:9.5px; font-family:var(--mono); padding:1px 5px; border-radius:8px; margin-top:2px; display:inline-block;}
+  .conf.alta{background:#DCEEE0; color:#255C36;} .conf.media{background:#FCF1DC; color:#7A4E0A;} .conf.baixa{background:#FBE2DC; color:#8A2E1B;} .conf.manual{background:#DCE6EE; color:#1F4E6E;}
+  tr.totalRow td{background:var(--paper-2); font-weight:700; font-family:var(--mono);}
+  .progressLine{font-family:var(--mono); font-size:12.5px; color:var(--teal-deep); margin-top:10px;}
+  footer.note{max-width:1500px; margin:0 auto; padding:0 5vw 60px; color:var(--ink-soft); font-size:12px; line-height:1.6;}
+  details.advanced{margin-top:16px; border-top:1px dashed var(--line-strong); padding-top:12px;}
+  details.advanced summary{cursor:pointer; font-size:12.5px; color:var(--ink-soft); font-weight:600;}
+  details.advanced .inner{margin-top:10px;}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brandblock">
+    <div class="eyebrow">// Só os orçamentos — o resto a ferramenta monta sozinha</div>
+    <h1>Mapa de Cotação</h1>
+    <p class="lede">Anexe os orçamentos em PDF dos fornecedores. A ferramenta lê cada um (mesmo escaneado), monta sozinha a lista de insumos a partir do que foi cotado, cruza os itens entre fornecedores e gera o mapa comparativo pronto pra baixar.</p>
+  </div>
+  <button class="ghost small" onclick="resetAll()">↺ Recomeçar</button>
+</header>
+<div class="ruler"></div>
+
+<main>
+
+  <!-- STEP 1: UPLOAD PDFS -->
+  <section class="card" id="cardUpload">
+    <div class="card-head">
+      <h2><span class="stepnum">1</span> Orçamentos dos fornecedores <span class="badgeCount" id="supplierCount">0</span></h2>
+    </div>
+    <div class="card-body">
+      <p class="hint">Solte quantos PDFs quiser — de uma vez ou aos poucos. Funciona com PDF de texto ou digitalizado (imagem). Não tem limite de fornecedores.</p>
+      <div class="dropzone" id="dropzone">
+        <div class="dz-icon">📄</div>
+        <div class="dz-title">Arraste os PDFs aqui ou clique para escolher</div>
+        <div class="dz-sub">Um ou vários arquivos .pdf</div>
+        <input type="file" id="pdfInput" accept="application/pdf" multiple style="display:none">
+      </div>
+      <div id="suppliersWrap"></div>
+
+      <details class="advanced">
+        <summary>Caso raro: já tenho a lista de insumos pronta e quero usar essa lista em vez da automática</summary>
+        <div class="inner">
+          <p class="hint">Só use isso se precisar forçar uma lista específica de itens (com Insumo / Unidade / Qtd. prevista) em vez de deixar a ferramenta montar a partir dos orçamentos.</p>
+          <input type="file" id="baseFileInput" accept=".xlsx,.xls" style="display:none">
+          <button class="small" onclick="document.getElementById('baseFileInput').click()">Importar lista de uma planilha (.xlsx)</button>
+          <button class="small ghost" onclick="clearManualBase()">Voltar ao automático</button>
+          <div id="baseStatus" class="hint" style="margin-top:8px;"></div>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- STEP 2: COMPARISON -->
+  <section class="card disabled" id="cardComp">
+    <div class="card-head">
+      <h2><span class="stepnum">2</span> Comparativo</h2>
+      <div style="display:flex; gap:8px;">
+        <button class="primary" id="btnGenerate" onclick="generateComparison()" disabled>Gerar comparativo</button>
+        <button class="amber" id="btnExport" onclick="exportWorkbook()" disabled>⬇ Baixar mapa (.xlsx)</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <p class="hint">Prévia editável — clique em qualquer valor pra corrigir, ou troque a correspondência no seletor de cada célula.</p>
+      <div id="progressWrap"></div>
+      <div id="compWrap"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="note">
+  Este processamento roda no seu navegador: os PDFs viram imagem e são enviados para leitura via API da Anthropic só durante a análise, e o arquivo final é gerado e baixado localmente — nada fica salvo em servidor. Sempre confira os valores extraídos antes de usar o mapa para decisão de compra.
+</footer>
+
+<script>
+/* ============================= STATE ============================= */
+let suppliers = [];        // {id, fileName, status, error, fornecedor, condPagamento, prazoEntrega, frete, itens:[...], matches:{row:{itemIndex,confidence}}, open}
+let baseItems = null;      // null = auto-derive from PDFs. Otherwise: [{row, insumo, unidade, qtd}] (manual override list)
+let derivedItems = null;   // the auto-derived (or manually imported) working list actually used for the last generated comparison
+
+function uid(){ return 'id' + Math.random().toString(36).slice(2,10); }
+function escHtml(s){ return String(s===undefined||s===null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s){ return escHtml(s).replace(/"/g,'&quot;'); }
+function fmtNum(n){ if(n===null||n===undefined||isNaN(n)) return '—'; return Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function numOrNull(v){ if(v===null||v===undefined||v==='') return null; const n=Number(v); return isNaN(n)?null:n; }
+function numOrEmpty(v){ return (v===null||v===undefined)?'':v; }
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+document.addEventListener('DOMContentLoaded', () => {
+  setupPdfDropzone();
+  document.getElementById('pdfInput').addEventListener('change', e => { handleFiles(e.target.files); e.target.value=''; });
+  document.getElementById('baseFileInput').addEventListener('change', e => { if(e.target.files[0]) importBaseXlsx(e.target.files[0]); e.target.value=''; });
+});
+
+function resetAll(){
+  if(!confirm('Isso limpa os fornecedores carregados e o comparativo. Continuar?')) return;
+  suppliers = []; baseItems = null; derivedItems = null;
+  document.getElementById('suppliersWrap').innerHTML = '';
+  document.getElementById('baseStatus').innerHTML = '';
+  document.getElementById('compWrap').innerHTML = '';
+  document.getElementById('progressWrap').innerHTML = '';
+  updateButtons();
+}
+
+/* ============================= OPTIONAL: MANUAL BASE LIST IMPORT ============================= */
+function cellText(ws, r, c){
+  const ref = XLSX.utils.encode_cell({r,c});
+  const cell = ws[ref];
+  if(!cell || cell.v===undefined || cell.v===null) return '';
+  return String(cell.v).trim();
+}
+function cellNum(ws, r, c){
+  const ref = XLSX.utils.encode_cell({r,c});
+  const cell = ws[ref];
+  if(!cell || cell.v===undefined || cell.v===null) return null;
+  const n = Number(cell.v);
+  return isNaN(n) ? null : n;
+}
+async function importBaseXlsx(file){
+  const statusBox = document.getElementById('baseStatus');
+  statusBox.innerHTML = '';
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    const sheetName = wb.SheetNames.find(n => /cota/i.test(n)) || wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    let headerRow = -1, colInsumo = -1;
+    for(let r=range.s.r; r<=range.e.r && headerRow<0; r++){
+      for(let c=range.s.c; c<=range.e.c; c++){
+        if(cellText(ws,r,c).toLowerCase() === 'insumo'){ headerRow=r; colInsumo=c; break; }
+      }
+    }
+    if(headerRow < 0) throw new Error('Não encontrei uma coluna "Insumo" nesta planilha.');
+    let colUnidade=-1, colQtd=-1;
+    for(let c=range.s.c;c<=range.e.c;c++){
+      const t = cellText(ws,headerRow,c).toLowerCase();
+      if(t==='unidade') colUnidade=c;
+      if(/prevista/.test(t)) colQtd=c;
+    }
+    const items = [];
+    for(let r=headerRow+1;r<=range.e.r;r++){
+      const insumo = cellText(ws,r,colInsumo);
+      if(!insumo) break;
+      items.push({row:r, insumo, unidade: cellText(ws,r,colUnidade), qtd: cellNum(ws,r,colQtd)});
+    }
+    if(items.length===0) throw new Error('Encontrei a coluna "Insumo" mas nenhuma linha de item abaixo dela.');
+    baseItems = items;
+    statusBox.innerHTML = `<span style="color:#1E4A2C; font-weight:600;">✓ ${items.length} itens importados — serão usados no lugar da lista automática.</span>`;
+  }catch(err){
+    statusBox.innerHTML = `<div class="errbanner">Não consegui importar: ${escHtml(err.message)}</div>`;
+  }
+}
+function clearManualBase(){
+  baseItems = null;
+  document.getElementById('baseStatus').innerHTML = '<span style="color:var(--ink-soft);">Lista automática restaurada.</span>';
+}
+
+/* ============================= STEP 1: PDF UPLOAD ============================= */
+function setupPdfDropzone(){
+  const dz = document.getElementById('dropzone');
+  dz.addEventListener('click', () => document.getElementById('pdfInput').click());
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); }));
+  dz.addEventListener('drop', e => { handleFiles(e.dataTransfer.files); });
+}
+function handleFiles(fileList){
+  const files = Array.from(fileList).filter(f => f.type==='application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+  files.forEach(f => processSupplierFile(f));
+}
+
+async function processSupplierFile(file){
+  const supplier = {
+    id: uid(), fileName: file.name, status:'loading', error:null,
+    fornecedor: file.name.replace(/\.pdf$/i,''), condPagamento:'', prazoEntrega:'', frete:'',
+    itens: [], matches: {}, open:true
+  };
+  suppliers.push(supplier);
+  renderSuppliers();
+  try{
+    const images = await pdfToImages(file);
+    if(images.length===0) throw new Error('Não consegui renderizar nenhuma página deste PDF.');
+    const extracted = await extractSupplierData(images);
+    supplier.fornecedor = extracted.fornecedor || supplier.fornecedor;
+    supplier.condPagamento = extracted.condicao_pagamento || '';
+    supplier.prazoEntrega = extracted.prazo_entrega || '';
+    supplier.frete = extracted.frete || '';
+    supplier.itens = Array.isArray(extracted.itens) ? extracted.itens.map(it => ({
+      codigo: it.codigo||'', descricao: it.descricao||'', unidade: it.unidade||'',
+      quantidade: numOrNull(it.quantidade), valorUnit: numOrNull(it.valor_unitario), valorTotal: numOrNull(it.valor_total)
+    })) : [];
+    if(supplier.itens.length===0) throw new Error('Não consegui extrair itens deste orçamento.');
+    supplier.status = 'ok';
+  }catch(err){
+    supplier.status = 'error';
+    supplier.error = err.message || String(err);
+  }
+  renderSuppliers();
+  updateButtons();
+}
+
+async function pdfToImages(file, maxPages, scale){
+  maxPages = maxPages || 6; scale = scale || 2.2;
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  const n = Math.min(pdf.numPages, maxPages);
+  const images = [];
+  for(let i=1;i<=n;i++){
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({scale});
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
+    const ctx = canvas.getContext('2d');
+    await page.render({canvasContext: ctx, viewport}).promise;
+    images.push(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
+  }
+  return images;
+}
+
+/* ============================= CLAUDE API ============================= */
+async function callClaude(content, systemPrompt){
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({model:'claude-sonnet-4-6', max_tokens:1000, system:systemPrompt, messages:[{role:'user', content}]})
+  });
+  const data = await response.json();
+  if(data.error) throw new Error(data.error.message || 'Erro na API');
+  return (data.content||[]).map(b => b.type==='text'?b.text:'').join('');
+}
+function safeParseJson(raw){
+  let t = raw.trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+  try{ return JSON.parse(t); }catch(e){}
+  const first=t.indexOf('{'); const last=t.lastIndexOf('}');
+  if(first>=0 && last>first){
+    let candidate = t.slice(first,last+1);
+    try{ return JSON.parse(candidate); }catch(e){}
+    let fixed = candidate.replace(/,\s*$/,'');
+    const ob=(fixed.match(/{/g)||[]).length, cb=(fixed.match(/}/g)||[]).length;
+    const osq=(fixed.match(/\[/g)||[]).length, csq=(fixed.match(/\]/g)||[]).length;
+    for(let i=0;i<(osq-csq);i++) fixed+=']';
+    for(let i=0;i<(ob-cb);i++) fixed+='}';
+    try{ return JSON.parse(fixed); }catch(e){}
+  }
+  throw new Error('Resposta da IA não veio em JSON válido.');
+}
+
+const EXTRACTION_SYSTEM = "Você é um especialista em ler orçamentos e cotações de materiais de construção/hidráulica no Brasil, incluindo documentos escaneados de baixa qualidade. Extraia os dados com máxima fidelidade ao que está escrito no documento, sem inventar valores. Responda SOMENTE com um JSON válido, sem markdown, sem texto antes ou depois.";
+function extractionPrompt(){
+  return 'Extraia os dados deste orçamento/cotação nas imagens anexadas. Formato de resposta (apenas JSON, sem markdown):\n' +
+  '{"fornecedor": "nome da empresa vendedora", "condicao_pagamento": "texto como aparece", "prazo_entrega": "texto", "frete": "texto ou null", "valor_total_cotacao": numero_ou_null, ' +
+  '"itens": [{"codigo": "codigo ou null", "descricao": "descrição completa", "unidade": "unidade ou null", "quantidade": numero_ou_null, "valor_unitario": numero_ou_null, "valor_total": numero_ou_null}]}\n' +
+  'Regras: ponto decimal (nunca vírgula). Não pule nenhum item da tabela. Se um valor não estiver legível, use null em vez de adivinhar. Mantenha as descrições como aparecem no documento.';
+}
+async function extractSupplierData(images){
+  const content = images.map(img => ({type:'image', source:{type:'base64', media_type:'image/jpeg', data: img}}));
+  content.push({type:'text', text: extractionPrompt()});
+  return safeParseJson(await callClaude(content, EXTRACTION_SYSTEM));
+}
+
+const CLUSTER_SYSTEM = "Você é um especialista em materiais de construção/hidráulica. Sua tarefa é olhar itens de vários orçamentos diferentes e agrupar os que são o MESMO material e a MESMA medida/diâmetro em uma lista única e enxuta, mesmo quando a redação, marca ou abreviação variam entre fornecedores. Responda SOMENTE com JSON válido, sem markdown.";
+function buildClusterPrompt(pooledItems){
+  return 'Itens vindos de orçamentos de fornecedores diferentes (cada um com a origem indicada):\n' + JSON.stringify(pooledItems) +
+  '\n\nAgrupe os itens equivalentes (mesmo material, mesma medida/diâmetro — ignore marca/fabricante/sigla) em uma lista única e canônica, sem duplicar. Escreva uma descrição limpa e objetiva para cada grupo. Responda apenas:\n' +
+  '{"insumos": [{"descricao": "...", "unidade": "..."}]}';
+}
+async function buildCanonicalInsumos(okSuppliers){
+  const pooled = [];
+  okSuppliers.forEach((s, si) => {
+    s.itens.forEach((it, idx) => pooled.push({fornecedor: si, descricao: it.descricao, unidade: it.unidade}));
+  });
+  const raw = await callClaude([{type:'text', text: buildClusterPrompt(pooled)}], CLUSTER_SYSTEM);
+  const parsed = safeParseJson(raw);
+  return (parsed.insumos || []).map((it, idx) => ({row: idx, insumo: it.descricao, unidade: it.unidade || '', qtd: null}));
+}
+
+const MATCH_SYSTEM = "Você é um especialista em materiais de construção/hidráulica e cruza descrições de itens entre orçamentos diferentes, mesmo quando fabricantes, abreviações e formatação variam. Responda SOMENTE com JSON válido, sem markdown.";
+function buildMatchPrompt(baseList, itemList, fornecedorNome){
+  return 'Lista base de insumos (row e descrição):\n' + JSON.stringify(baseList) +
+  '\n\nItens do orçamento do fornecedor "' + fornecedorNome + '" (index e descrição):\n' + JSON.stringify(itemList) +
+  '\n\nPara CADA insumo da lista base, encontre o item do orçamento que é o MESMO material e a MESMA medida/diâmetro (ignore diferenças de marca, sigla ou abreviação). Se não houver correspondência clara e confiável, retorne item_index null. Responda apenas:\n' +
+  '{"matches": [{"row": numero, "item_index": indice_ou_null, "confianca": "alta"|"media"|"baixa"}]}';
+}
+async function matchSupplierItems(supplier, items){
+  const baseList = items.map(b => ({row:b.row, descricao:b.insumo}));
+  const itemList = supplier.itens.map((it,idx) => ({index:idx, descricao:it.descricao, unidade:it.unidade}));
+  const parsed = safeParseJson(await callClaude([{type:'text', text: buildMatchPrompt(baseList,itemList,supplier.fornecedor)}], MATCH_SYSTEM));
+  const matches = {};
+  (parsed.matches||[]).forEach(m => {
+    if(m.item_index!==null && m.item_index!==undefined) matches[m.row] = {itemIndex:m.item_index, confidence:m.confianca||'media'};
+  });
+  return matches;
+}
+
+/* ============================= SUPPLIER CARDS UI ============================= */
+function toggleSupplier(id){ const s=suppliers.find(x=>x.id===id); if(s){ s.open=!s.open; renderSuppliers(); } }
+function removeSupplier(id){ suppliers = suppliers.filter(s=>s.id!==id); renderSuppliers(); updateButtons(); }
+function updateSupplierMeta(id, field, value){ const s=suppliers.find(x=>x.id===id); if(s) s[field]=value; }
+function updateSupplierItem(id, idx, field, value){
+  const s=suppliers.find(x=>x.id===id); if(!s) return;
+  const it=s.itens[idx]; if(!it) return;
+  if(field==='descricao'||field==='unidade'||field==='codigo') it[field]=value;
+  else it[field]=parseFloat(String(value).replace(',','.'))||0;
+}
+function renderSuppliers(){
+  document.getElementById('supplierCount').textContent = suppliers.length;
+  const wrap = document.getElementById('suppliersWrap');
+  if(suppliers.length===0){ wrap.innerHTML=''; return; }
+  let html='';
+  suppliers.forEach(s => {
+    const dotClass = s.status==='loading'?'loading':(s.status==='ok'?'ok':'err');
+    html += `<div class="supplierCard">
+      <div class="sc-head" onclick="toggleSupplier('${s.id}')">
+        <div class="sc-head-left">
+          <span class="statusdot ${dotClass}"></span>
+          <span class="sc-title">${escHtml(s.fornecedor||s.fileName)}</span>
+          <span class="sc-sub">${escHtml(s.fileName)}</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          ${s.status==='ok' ? `<span class="sc-sub">${s.itens.length} itens</span>` : ''}
+          ${s.status==='loading' ? '<span class="sc-sub">Lendo documento…</span>' : ''}
+          <button class="small" onclick="event.stopPropagation(); removeSupplier('${s.id}')">Remover</button>
+        </div>
+      </div>
+      <div class="sc-body ${s.open?'open':''}">`;
+    if(s.status==='error'){
+      html += `<div class="errbanner">Falha ao ler este orçamento: ${escHtml(s.error)}. Remova e reenvie o arquivo.</div>`;
+    }
+    html += `<div class="metaGrid">
+        <div><label>Fornecedor</label><input value="${escAttr(s.fornecedor)}" onchange="updateSupplierMeta('${s.id}','fornecedor',this.value)"></div>
+        <div><label>Condição de pagamento</label><input value="${escAttr(s.condPagamento)}" onchange="updateSupplierMeta('${s.id}','condPagamento',this.value)"></div>
+        <div><label>Prazo de entrega</label><input value="${escAttr(s.prazoEntrega)}" onchange="updateSupplierMeta('${s.id}','prazoEntrega',this.value)"></div>
+        <div><label>Frete</label><input value="${escAttr(s.frete)}" onchange="updateSupplierMeta('${s.id}','frete',this.value)"></div>
+      </div>`;
+    if(s.itens && s.itens.length){
+      html += '<table class="itemsTbl"><thead><tr><th>Código</th><th>Descrição</th><th>Un.</th><th>Qtd</th><th>Vlr. Unit.</th><th>Vlr. Total</th></tr></thead><tbody>';
+      s.itens.forEach((it,idx) => {
+        html += `<tr>
+          <td><input value="${escAttr(it.codigo)}" onchange="updateSupplierItem('${s.id}',${idx},'codigo',this.value)" style="width:70px"></td>
+          <td><input value="${escAttr(it.descricao)}" onchange="updateSupplierItem('${s.id}',${idx},'descricao',this.value)" style="min-width:220px"></td>
+          <td><input value="${escAttr(it.unidade)}" onchange="updateSupplierItem('${s.id}',${idx},'unidade',this.value)" style="width:56px"></td>
+          <td><input class="num" value="${numOrEmpty(it.quantidade)}" onchange="updateSupplierItem('${s.id}',${idx},'quantidade',this.value)" style="width:56px"></td>
+          <td><input class="num" value="${numOrEmpty(it.valorUnit)}" onchange="updateSupplierItem('${s.id}',${idx},'valorUnit',this.value)" style="width:80px"></td>
+          <td><input class="num" value="${numOrEmpty(it.valorTotal)}" onchange="updateSupplierItem('${s.id}',${idx},'valorTotal',this.value)" style="width:80px"></td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+    }
+    html += '</div></div>';
+  });
+  wrap.innerHTML = html;
+  updateButtons();
+}
+
+/* ============================= STEP 2: COMPARISON ============================= */
+function updateButtons(){
+  const okSuppliers = suppliers.filter(s=>s.status==='ok');
+  document.getElementById('btnGenerate').disabled = okSuppliers.length===0;
+  document.getElementById('cardComp').classList.toggle('disabled', okSuppliers.length===0);
+}
+
+function mode(arr){
+  const counts = {};
+  let best=null, bestCount=0;
+  arr.forEach(v => {
+    if(v===null||v===undefined) return;
+    counts[v] = (counts[v]||0)+1;
+    if(counts[v]>bestCount){ bestCount=counts[v]; best=v; }
+  });
+  return best;
+}
+
+async function generateComparison(){
+  const okSuppliers = suppliers.filter(s=>s.status==='ok');
+  if(okSuppliers.length===0) return;
+  const progress = document.getElementById('progressWrap');
+  document.getElementById('btnGenerate').disabled = true;
+  document.getElementById('btnExport').disabled = true;
+  progress.innerHTML = '';
+
+  let items;
+  if(baseItems){
+    items = baseItems.map(it => ({row:it.row, insumo:it.insumo, unidade:it.unidade, qtd:it.qtd}));
+    progress.innerHTML = '<div class="progressLine">Usando a lista de insumos importada.</div>';
+  } else {
+    progress.innerHTML = '<div class="progressLine">Montando a lista de insumos a partir dos orçamentos…</div>';
+    try{
+      items = await buildCanonicalInsumos(okSuppliers);
+    }catch(err){
+      progress.innerHTML += `<div class="errbanner">Não consegui montar a lista automática (${escHtml(err.message)}). Tente novamente ou importe uma lista manualmente.</div>`;
+      document.getElementById('btnGenerate').disabled = false;
+      return;
+    }
+    if(items.length===0){
+      progress.innerHTML += '<div class="errbanner">Não encontrei itens para comparar.</div>';
+      document.getElementById('btnGenerate').disabled = false;
+      return;
+    }
+  }
+
+  for(let i=0;i<okSuppliers.length;i++){
+    const s = okSuppliers[i];
+    progress.innerHTML += `<div class="progressLine">Comparando itens de "${escHtml(s.fornecedor)}"… (${i+1}/${okSuppliers.length})</div>`;
+    try{
+      s.matches = await matchSupplierItems(s, items);
+    }catch(err){
+      s.matches = {};
+      progress.innerHTML += `<div class="warnbanner">Não consegui cruzar automaticamente os itens de "${escHtml(s.fornecedor)}" (${escHtml(err.message)}). Selecione manualmente na tabela.</div>`;
+    }
+  }
+
+  // fill in quantity per item (mode of matched supplier quantities) if not already set
+  items.forEach(it => {
+    if(it.qtd !== null && it.qtd !== undefined) return;
+    const qtys = [];
+    okSuppliers.forEach(s => {
+      const m = s.matches[it.row];
+      if(m && m.itemIndex!==null && m.itemIndex!==undefined){
+        const raw = s.itens[m.itemIndex];
+        if(raw && raw.quantidade!==null && raw.quantidade!==undefined) qtys.push(raw.quantidade);
+      }
+    });
+    it.qtd = qtys.length ? mode(qtys) : null;
+  });
+
+  derivedItems = items;
+  progress.innerHTML += '<div class="progressLine">Comparativo pronto — revise abaixo antes de baixar.</div>';
+  renderComparisonTable();
+  document.getElementById('btnGenerate').disabled = false;
+  document.getElementById('btnExport').disabled = false;
+}
+
+function getSupplierValueForRow(supplier, row){
+  const m = supplier.matches[row];
+  if(!m || m.itemIndex===null || m.itemIndex===undefined) return null;
+  const it = supplier.itens[m.itemIndex];
+  if(!it) return null;
+  return {unit: it.valorUnit, total: it.valorTotal, confidence: m.confidence, itemIndex: m.itemIndex};
+}
+function setManualMatch(supplierId, row, itemIndexStr){
+  const s = suppliers.find(x=>x.id===supplierId); if(!s) return;
+  if(itemIndexStr==='') delete s.matches[row];
+  else s.matches[row] = {itemIndex: parseInt(itemIndexStr,10), confidence:'manual'};
+  renderComparisonTable();
+}
+function setManualCell(supplierId, row, field, value){
+  const s = suppliers.find(x=>x.id===supplierId); if(!s) return;
+  const m = s.matches[row];
+  const num = parseFloat(String(value).replace(',','.'))||0;
+  if(m && m.itemIndex!==null && m.itemIndex!==undefined && s.itens[m.itemIndex]){
+    if(field==='unit') s.itens[m.itemIndex].valorUnit=num; else s.itens[m.itemIndex].valorTotal=num;
+  }else{
+    s.itens.push({codigo:'', descricao:'(valor manual)', unidade:'', quantidade:null, valorUnit: field==='unit'?num:0, valorTotal: field==='total'?num:0});
+    s.matches[row] = {itemIndex: s.itens.length-1, confidence:'manual'};
+  }
+  renderComparisonTable();
+}
+function updateDerivedItem(idx, field, value){
+  const it = derivedItems[idx]; if(!it) return;
+  if(field==='qtd') it.qtd = parseFloat(String(value).replace(',','.'))||0;
+  else it[field] = value;
+  renderComparisonTable();
+}
+
+function renderComparisonTable(){
+  const okSuppliers = suppliers.filter(s=>s.status==='ok');
+  const wrap = document.getElementById('compWrap');
+  if(!derivedItems || okSuppliers.length===0){ wrap.innerHTML=''; return; }
+
+  let thead = '<thead><tr><th rowspan="2">Insumo</th><th rowspan="2">Un.</th><th rowspan="2">Qtd.</th>';
+  okSuppliers.forEach(s => { thead += `<th colspan="2">${escHtml(s.fornecedor)}</th>`; });
+  thead += '<th colspan="3">Melhor preço</th></tr><tr class="sub">';
+  okSuppliers.forEach(()=>{ thead += '<th>Unit.</th><th>Total</th>'; });
+  thead += '<th>Unit.</th><th>Total</th><th>Fornecedor</th></tr></thead>';
+
+  let tbody = '<tbody>';
+  const totalsPerSupplier = okSuppliers.map(()=>0);
+  let bestGrandTotal = 0;
+
+  derivedItems.forEach((b, bidx) => {
+    let rowBest = null, rowCells = '';
+    okSuppliers.forEach(s => {
+      const val = getSupplierValueForRow(s, b.row);
+      const unit = val ? val.unit : null;
+      const total = val ? (val.total!==null && val.total!==undefined ? val.total : (unit!==null && b.qtd ? unit*b.qtd : null)) : null;
+      if(unit!==null && unit!==undefined){
+        const si = okSuppliers.indexOf(s);
+        totalsPerSupplier[si] += (total||0);
+        if(rowBest===null || unit<rowBest.unit) rowBest = {unit, total: total||0, fornecedor: s.fornecedor};
+      }
+      const confBadge = val && val.confidence ? `<div class="conf ${val.confidence}">${val.confidence}</div>` : '';
+      const options = ['<option value="">— sem correspondência —</option>']
+        .concat(s.itens.map((it,idx)=>`<option value="${idx}" ${val&&val.itemIndex===idx?'selected':''}>${escHtml(it.descricao)} (R$ ${fmtNum(it.valorUnit)})</option>`));
+      rowCells += `<td class="num">
+          <input class="cellnum" value="${unit===null?'':unit}" onchange="setManualCell('${s.id}',${b.row},'unit',this.value)">
+          ${confBadge}
+          <select class="matchSel" onchange="setManualMatch('${s.id}',${b.row},this.value)">${options.join('')}</select>
+        </td>
+        <td class="num"><input class="cellnum" value="${total===null?'':total}" onchange="setManualCell('${s.id}',${b.row},'total',this.value)"></td>`;
+    });
+    if(rowBest) bestGrandTotal += rowBest.total;
+    tbody += `<tr>
+      <td class="insumo"><input value="${escAttr(b.insumo)}" onchange="updateDerivedItem(${bidx},'insumo',this.value)" style="font-weight:600; width:100%; border:none; background:transparent;"></td>
+      <td><input value="${escAttr(b.unidade)}" onchange="updateDerivedItem(${bidx},'unidade',this.value)" style="width:56px; border:none; background:transparent;"></td>
+      <td class="num"><input class="cellnum" value="${numOrEmpty(b.qtd)}" onchange="updateDerivedItem(${bidx},'qtd',this.value)"></td>
+      ${rowCells}
+      <td class="num best">${rowBest?fmtNum(rowBest.unit):'—'}</td>
+      <td class="num best">${rowBest?fmtNum(rowBest.total):'—'}</td>
+      <td class="best">${rowBest?escHtml(rowBest.fornecedor):'—'}</td>
+    </tr>`;
+  });
+  tbody += '</tbody>';
+
+  let totalRow = '<tr class="totalRow"><td colspan="3">TOTAL</td>';
+  okSuppliers.forEach((s,si) => { totalRow += `<td colspan="2" class="num">R$ ${fmtNum(totalsPerSupplier[si])}</td>`; });
+  totalRow += `<td colspan="2" class="num">R$ ${fmtNum(bestGrandTotal)}</td><td></td></tr>`;
+
+  wrap.innerHTML = `<div class="compWrap"><table class="compTbl">${thead}${tbody}${totalRow}</table></div>`;
+}
+
+/* ============================= EXPORT: BUILD XLSX FROM SCRATCH ============================= */
+function colLetter(n){
+  let s=''; n=n+1;
+  while(n>0){ let rem=(n-1)%26; s=String.fromCharCode(65+rem)+s; n=Math.floor((n-1)/26); }
+  return s;
+}
+function xmlEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+const XSTYLE = { TITLE:1, HEADER:2, NORMAL_TEXT:0, NORMAL_NUM:4, BEST_NUM:5, BEST_TEXT:6, TOTAL_LABEL:7, TOTAL_NUM:8, COND_LABEL:9, COND_TEXT:10 };
+
+const STYLES_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+'<numFmts count="1"><numFmt numFmtId="164" formatCode="0.00"/></numFmts>' +
+'<fonts count="5">' +
+'<font><sz val="11"/><name val="Calibri"/></font>' +
+'<font><b/><sz val="18"/><name val="Calibri"/><color rgb="FF1E2A28"/></font>' +
+'<font><b/><sz val="10"/><name val="Calibri"/><color rgb="FFFBFBF8"/></font>' +
+'<font><b/><sz val="10"/><name val="Calibri"/><color rgb="FF1E2A28"/></font>' +
+'<font><b/><sz val="11"/><name val="Calibri"/><color rgb="FF2A1A03"/></font>' +
+'</fonts>' +
+'<fills count="5">' +
+'<fill><patternFill patternType="none"/></fill>' +
+'<fill><patternFill patternType="gray125"/></fill>' +
+'<fill><patternFill patternType="solid"><fgColor rgb="FF1E2A28"/><bgColor indexed="64"/></patternFill></fill>' +
+'<fill><patternFill patternType="solid"><fgColor rgb="FFE3E6DC"/><bgColor indexed="64"/></patternFill></fill>' +
+'<fill><patternFill patternType="solid"><fgColor rgb="FFFBE9C9"/><bgColor indexed="64"/></patternFill></fill>' +
+'</fills>' +
+'<borders count="2">' +
+'<border><left/><right/><top/><bottom/><diagonal/></border>' +
+'<border><left style="thin"><color rgb="FFC7CCC0"/></left><right style="thin"><color rgb="FFC7CCC0"/></right><top style="thin"><color rgb="FFC7CCC0"/></top><bottom style="thin"><color rgb="FFC7CCC0"/></bottom><diagonal/></border>' +
+'</borders>' +
+'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+'<cellXfs count="11">' +
+'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>' +
+'<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0"/>' +
+'<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>' +
+'<xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>' +
+'<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>' +
+'<xf numFmtId="164" fontId="4" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>' +
+'<xf numFmtId="0" fontId="4" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>' +
+'<xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>' +
+'<xf numFmtId="164" fontId="3" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>' +
+'<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1"/>' +
+'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>' +
+'</cellXfs>' +
+'</styleSheet>';
+
+function cellNumXml(ref, style, value){
+  if(value===null||value===undefined||value==='') return `<c r="${ref}" s="${style}"/>`;
+  return `<c r="${ref}" s="${style}"><v>${value}</v></c>`;
+}
+function cellStrXml(ref, style, value){
+  if(value===null||value===undefined||value==='') return `<c r="${ref}" s="${style}"/>`;
+  return `<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(value)}</t></is></c>`;
+}
+function buildSheetXml(rows, dims){
+  let body = rows.map(row => {
+    const cellsXml = row.cells.map(c => {
+      const ref = colLetter(c.col) + row.r;
+      return c.type==='n' ? cellNumXml(ref,c.style,c.value) : cellStrXml(ref,c.style,c.value);
+    }).join('');
+    return `<row r="${row.r}" spans="1:${dims.maxCol+1}">${cellsXml}</row>`;
+  }).join('');
+  const colsXml = dims.cols.map(c => `<col min="${c.min}" max="${c.max}" width="${c.width}" customWidth="1"/>`).join('');
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+  '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+  `<dimension ref="A1:${colLetter(dims.maxCol)}${dims.maxRow}"/>` +
+  '<sheetViews><sheetView tabSelected="1" workbookViewId="0"><pane ySplit="2" topLeftCell="A3" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>' +
+  '<sheetFormatPr defaultRowHeight="15"/>' +
+  `<cols>${colsXml}</cols>` +
+  `<sheetData>${body}</sheetData>` +
+  '</worksheet>';
+}
+const WORKBOOK_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+'<sheets><sheet name="Mapa de Cotação" sheetId="1" r:id="rId1"/></sheets>' +
+'<calcPr fullCalcOnLoad="1"/>' +
+'</workbook>';
+const WORKBOOK_RELS = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+'</Relationships>';
+const ROOT_RELS = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+'</Relationships>';
+const CONTENT_TYPES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+'<Default Extension="xml" ContentType="application/xml"/>' +
+'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+'<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+'<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+'</Types>';
+
+async function exportWorkbook(){
+  const okSuppliers = suppliers.filter(s=>s.status==='ok');
+  if(!derivedItems || okSuppliers.length===0) return;
+  const progress = document.getElementById('progressWrap');
+  try{
+    const rows = [];
+    rows.push({r:1, cells:[{col:0,type:'s',style:XSTYLE.TITLE,value:'MAPA DE COTAÇÃO'}]});
+
+    let headerCells = [
+      {col:0,type:'s',style:XSTYLE.HEADER,value:'Insumo'},
+      {col:1,type:'s',style:XSTYLE.HEADER,value:'Unidade'},
+      {col:2,type:'s',style:XSTYLE.HEADER,value:'Qtd. prevista'}
+    ];
+    let col = 3;
+    okSuppliers.forEach(s => {
+      headerCells.push({col:col,type:'s',style:XSTYLE.HEADER,value:s.fornecedor+' — Vlr. Unit.'});
+      headerCells.push({col:col+1,type:'s',style:XSTYLE.HEADER,value:s.fornecedor+' — Vlr. Total'});
+      col += 2;
+    });
+    headerCells.push({col:col,type:'s',style:XSTYLE.HEADER,value:'Melhor Preço — Unit.'});
+    headerCells.push({col:col+1,type:'s',style:XSTYLE.HEADER,value:'Melhor Preço — Total'});
+    headerCells.push({col:col+2,type:'s',style:XSTYLE.HEADER,value:'Melhor Preço — Fornecedor'});
+    const maxCol = col+2;
+    rows.push({r:2, cells: headerCells});
+
+    const totalsPerSupplier = okSuppliers.map(()=>0);
+    let bestGrandTotal = 0;
+    const FIRST_ROW = 3;
+
+    derivedItems.forEach((it, i) => {
+      const r = FIRST_ROW + i;
+      let cells = [
+        {col:0,type:'s',style:XSTYLE.NORMAL_TEXT,value:it.insumo},
+        {col:1,type:'s',style:XSTYLE.NORMAL_TEXT,value:it.unidade},
+        {col:2,type:'n',style:XSTYLE.NORMAL_NUM,value:it.qtd}
+      ];
+      let c = 3, best = null;
+      okSuppliers.forEach((s, si) => {
+        const val = getSupplierValueForRow(s, it.row);
+        const unit = val ? val.unit : null;
+        const total = val ? (val.total!==null && val.total!==undefined ? val.total : (unit!==null && it.qtd ? unit*it.qtd : null)) : null;
+        if(unit!==null && unit!==undefined){
+          totalsPerSupplier[si] += (total||0);
+          if(best===null || unit<best.unit) best = {unit, total: total||0, fornecedor: s.fornecedor};
+        }
+        cells.push({col:c,type:'n',style:XSTYLE.NORMAL_NUM,value:unit});
+        cells.push({col:c+1,type:'n',style:XSTYLE.NORMAL_NUM,value:total});
+        c += 2;
+      });
+      if(best) bestGrandTotal += best.total;
+      cells.push({col:c,type:'n',style:XSTYLE.BEST_NUM,value: best?best.unit:null});
+      cells.push({col:c+1,type:'n',style:XSTYLE.BEST_NUM,value: best?best.total:null});
+      cells.push({col:c+2,type:'s',style:XSTYLE.BEST_TEXT,value: best?best.fornecedor:''});
+      rows.push({r, cells});
+    });
+
+    const totalRowNum = FIRST_ROW + derivedItems.length;
+    let totalCells = [
+      {col:0,type:'s',style:XSTYLE.TOTAL_LABEL,value:'TOTAL'},
+      {col:1,type:'s',style:XSTYLE.TOTAL_LABEL,value:''},
+      {col:2,type:'s',style:XSTYLE.TOTAL_LABEL,value:''}
+    ];
+    let c2 = 3;
+    okSuppliers.forEach((s,si) => {
+      totalCells.push({col:c2,type:'s',style:XSTYLE.TOTAL_LABEL,value:''});
+      totalCells.push({col:c2+1,type:'n',style:XSTYLE.TOTAL_NUM,value: totalsPerSupplier[si]});
+      c2 += 2;
+    });
+    totalCells.push({col:c2,type:'s',style:XSTYLE.TOTAL_LABEL,value:''});
+    totalCells.push({col:c2+1,type:'n',style:XSTYLE.TOTAL_NUM,value: bestGrandTotal});
+    totalCells.push({col:c2+2,type:'s',style:XSTYLE.TOTAL_LABEL,value:''});
+    rows.push({r: totalRowNum, cells: totalCells});
+
+    function condRow(rNum, label, values){
+      let cells = [{col:0,type:'s',style:XSTYLE.COND_LABEL,value:label},{col:1,type:'s',style:XSTYLE.COND_LABEL,value:''},{col:2,type:'s',style:XSTYLE.COND_LABEL,value:''}];
+      let c = 3;
+      okSuppliers.forEach((s,si) => {
+        cells.push({col:c,type:'s',style:XSTYLE.COND_LABEL,value:''});
+        cells.push({col:c+1,type:'s',style:XSTYLE.COND_TEXT,value: values[si]||''});
+        c += 2;
+      });
+      rows.push({r:rNum, cells});
+    }
+    condRow(totalRowNum+1, 'Condição de pagamento', okSuppliers.map(s=>s.condPagamento));
+    condRow(totalRowNum+2, 'Prazo de entrega', okSuppliers.map(s=>s.prazoEntrega));
+    condRow(totalRowNum+3, 'Frete', okSuppliers.map(s=>s.frete));
+
+    const dims = { maxCol, maxRow: totalRowNum+3, cols: [{min:1,max:1,width:42},{min:2,max:2,width:12},{min:3,max:3,width:14}] };
+
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', CONTENT_TYPES);
+    zip.file('_rels/.rels', ROOT_RELS);
+    zip.file('xl/workbook.xml', WORKBOOK_XML);
+    zip.file('xl/_rels/workbook.xml.rels', WORKBOOK_RELS);
+    zip.file('xl/styles.xml', STYLES_XML);
+    zip.file('xl/worksheets/sheet1.xml', buildSheetXml(rows, dims));
+
+    const outBlob = await zip.generateAsync({type:'blob'});
+    const a = document.createElement('a');
+    const url = URL.createObjectURL(outBlob);
+    a.href = url; a.download = 'mapa_de_cotacao.xlsx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    progress.innerHTML += '<div class="okbanner">Arquivo baixado.</div>';
+  }catch(err){
+    progress.innerHTML += `<div class="errbanner">Não consegui gerar o arquivo final: ${escHtml(err.message)}.</div>`;
+  }
+}
+</script>
+</body>
+</html>
