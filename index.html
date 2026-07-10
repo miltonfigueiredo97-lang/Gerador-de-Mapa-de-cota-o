@@ -92,6 +92,7 @@
   table.compTbl td.num{font-family:var(--mono); text-align:right;}
   table.compTbl td.best{background:#FBE9C9; font-weight:700;}
   table.compTbl td.best::after{content:"★"; color:var(--amber-deep); margin-left:4px; font-size:10px;}
+  table.compTbl td.lowconf{background:#FFF3A3; box-shadow:inset 0 0 0 2px #E8D14A;}
   table.compTbl input.cellnum{width:82px; border:1px solid transparent; background:transparent; font-family:var(--mono); font-size:12.5px; text-align:right; padding:3px 4px; border-radius:2px;}
   table.compTbl input.cellnum:hover{border-color:var(--line-strong);}
   table.compTbl input.cellnum:focus{outline:none; border-color:var(--teal); background:var(--white);}
@@ -486,11 +487,17 @@ async function extractSupplierData(images){
   return safeParseJson(await callClaude(content, EXTRACTION_SYSTEM));
 }
 
-const MATCH_SYSTEM = "Você é um especialista em materiais de construção/hidráulica e cruza descrições de itens entre orçamentos diferentes, mesmo quando fabricantes, abreviações e formatação variam. Responda SOMENTE com JSON válido, sem markdown.";
+const MATCH_SYSTEM = "Você é um especialista em materiais de construção/hidráulica que cruza itens de orçamentos de fornecedores diferentes para o MESMO projeto de obra. Nomes comerciais, marcas e siglas variam muito entre fornecedores, mas o item quase sempre existe no orçamento — ele só está escrito de um jeito diferente. Sua prioridade é encontrar a peça certa usando código, tamanho/diâmetro e tipo de peça como critério principal — não o nome comercial. Responda SOMENTE com JSON válido, sem markdown.";
 function buildMatchPrompt(baseList, itemList, fornecedorNome){
-  return 'Lista base de insumos (row e descrição):\n' + JSON.stringify(baseList) +
+  return 'Lista base de insumos que preciso encontrar (row e descrição):\n' + JSON.stringify(baseList) +
   '\n\nItens do orçamento do fornecedor "' + fornecedorNome + '" (index e descrição):\n' + JSON.stringify(itemList) +
-  '\n\nPara CADA insumo da lista base, encontre o item do orçamento que é o MESMO material e a MESMA medida/diâmetro (ignore diferenças de marca, sigla ou abreviação). Se não houver correspondência clara e confiável, retorne item_index null. Responda apenas:\n' +
+  '\n\nPara CADA insumo da lista base, encontre o item do orçamento que corresponde a ele. Regras importantes:\n' +
+  '- Ignore diferenças de marca, fabricante, sigla ou forma de escrever — o que importa é: mesmo tipo de peça (tubo, joelho, luva, etc), mesma medida/diâmetro, mesmo código se houver.\n' +
+  '- Estes orçamentos são do MESMO projeto, então praticamente todo item da lista base tem uma correspondência no orçamento — ele só pode estar com um nome bem diferente do que você espera. Procure ativamente por essa correspondência antes de desistir.\n' +
+  '- NUNCA retorne item_index null só porque o nome não bate. Sempre escolha o candidato mais próximo por tipo+medida, mesmo que não tenha 100% de certeza.\n' +
+  '- Só retorne item_index null no caso raro de realmente não existir nenhum item nem remotamente compatível (nenhuma peça daquele tipo/medida no orçamento inteiro).\n' +
+  '- Use "confianca":"baixa" quando você escolheu o mais próximo mas não tem certeza absoluta (para o usuário revisar depois) — mas ainda assim retorne o item_index, nunca null nesse caso.\n' +
+  'Responda apenas:\n' +
   '{"matches": [{"row": numero, "item_index": indice_ou_null, "confianca": "alta"|"media"|"baixa"}]}';
 }
 async function matchSupplierItems(supplier){
@@ -673,14 +680,15 @@ function renderComparisonTable(){
         if(rowBest === null || unit < rowBest.unit) rowBest = {unit, total: total||0, fornecedor: s.fornecedor};
       }
       const confBadge = val && val.confidence ? `<div class="conf ${val.confidence}">${val.confidence}</div>` : '';
+      const lowConfClass = val && val.confidence === 'baixa' ? ' lowconf' : '';
       const options = ['<option value="">— sem correspondência —</option>']
         .concat(s.itens.map((it,idx)=>`<option value="${idx}" ${val && val.itemIndex===idx?'selected':''}>${escHtml(it.descricao)} (R$ ${fmtNum(it.valorUnit)})</option>`));
-      rowCells += `<td class="num">
+      rowCells += `<td class="num${lowConfClass}">
           <input class="cellnum" value="${unit===null?'':unit}" onchange="setManualCell('${s.id}',${b.row},'unit',this.value)">
           ${confBadge}
           <select class="matchSel" onchange="setManualMatch('${s.id}',${b.row},this.value)">${options.join('')}</select>
         </td>
-        <td class="num"><input class="cellnum" value="${total===null?'':total}" onchange="setManualCell('${s.id}',${b.row},'total',this.value)"></td>`;
+        <td class="num${lowConfClass}"><input class="cellnum" value="${total===null?'':total}" onchange="setManualCell('${s.id}',${b.row},'total',this.value)"></td>`;
     });
     if(rowBest) bestGrandTotal += rowBest.total;
     tbody += `<tr>
@@ -705,13 +713,26 @@ function renderComparisonTable(){
 /* ============================= EXPORT: SURGICAL XLSX PATCH ============================= */
 function xmlEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-function setCellInRowXml(rowXml, colLetter, rowNum1based, type, value){
+function getCellStyleId(sheetXml, ref){
+  const re = new RegExp('<c r="' + ref + '"([^>]*?)(?:/>|>)');
+  const m = sheetXml.match(re);
+  if(!m) return '0';
+  const sMatch = m[1].match(/\ss="(\d+)"/);
+  return sMatch ? sMatch[1] : '0';
+}
+
+function setCellInRowXml(rowXml, colLetter, rowNum1based, type, value, overrideStyle){
   const ref = colLetter + rowNum1based;
   const reSelf = new RegExp('<c r="' + ref + '"([^>]*)/>');
   const reFull = new RegExp('<c r="' + ref + '"([^>]*)>([\\s\\S]*?)</c>');
   function stripT(attrs){ return attrs.replace(/\st="[^"]*"/,''); }
-  function buildNumber(attrs){ return `<c r="${ref}"${stripT(attrs)}><v>${value}</v></c>`; }
-  function buildString(attrs){ return `<c r="${ref}"${stripT(attrs)} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(value)}</t></is></c>`; }
+  function applyOverrideStyle(attrs){
+    if(overrideStyle === undefined || overrideStyle === null) return attrs;
+    if(/\ss="\d+"/.test(attrs)) return attrs.replace(/\ss="\d+"/, ' s="'+overrideStyle+'"');
+    return attrs + ' s="'+overrideStyle+'"';
+  }
+  function buildNumber(attrs){ attrs = applyOverrideStyle(stripT(attrs)); return `<c r="${ref}"${attrs}><v>${value}</v></c>`; }
+  function buildString(attrs){ attrs = applyOverrideStyle(stripT(attrs)); return `<c r="${ref}"${attrs} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(value)}</t></is></c>`; }
   const build = type === 'number' ? buildNumber : buildString;
   if(reSelf.test(rowXml)) return rowXml.replace(reSelf, (m, attrs) => build(attrs));
   if(reFull.test(rowXml)) return rowXml.replace(reFull, (m, attrs) => build(attrs));
@@ -726,10 +747,55 @@ function patchSheetXml(xml, patches){
     const m = xml.match(reRow);
     if(!m) return;
     let rowInner = m[0];
-    byRow[rowNum].forEach(p => { rowInner = setCellInRowXml(rowInner, p.col, rowNum, p.type, p.value); });
+    byRow[rowNum].forEach(p => { rowInner = setCellInRowXml(rowInner, p.col, rowNum, p.type, p.value, p.overrideStyle); });
     xml = xml.replace(m[0], rowInner);
   });
   return xml;
+}
+
+function xfMatches(cellXfsInner){
+  return cellXfsInner.match(/<xf\b[^>]*\/>|<xf\b[^>]*>[\s\S]*?<\/xf>/g) || [];
+}
+
+// Adds a yellow fill to styles.xml and clones the given original cell styles with that fill applied,
+// so low-confidence matches can be highlighted in the downloaded file without disturbing any other formatting.
+function patchStylesXmlForYellow(stylesXml, originalStyleIds){
+  let xml = stylesXml;
+  const mapping = {};
+  if(originalStyleIds.length === 0) return {xml, mapping};
+
+  const fillsMatch = xml.match(/<fills count="(\d+)">([\s\S]*?)<\/fills>/);
+  if(!fillsMatch) return {xml, mapping}; // unexpected styles.xml shape — skip highlighting rather than risk corruption
+  const fillsCount = parseInt(fillsMatch[1], 10);
+  const yellowFillId = fillsCount;
+  const newFillsInner = fillsMatch[2] + '<fill><patternFill patternType="solid"><fgColor rgb="FFFFF3A3"/><bgColor indexed="64"/></patternFill></fill>';
+  xml = xml.replace(fillsMatch[0], `<fills count="${fillsCount+1}">${newFillsInner}</fills>`);
+
+  const cellXfsMatch = xml.match(/<cellXfs count="(\d+)">([\s\S]*?)<\/cellXfs>/);
+  if(!cellXfsMatch) return {xml: stylesXml, mapping}; // bail out safely, keep original styles.xml untouched
+  let cellXfsCount = parseInt(cellXfsMatch[1], 10);
+  let cellXfsInner = cellXfsMatch[2];
+  const xfList = xfMatches(cellXfsInner);
+
+  let appended = '';
+  originalStyleIds.forEach(origId => {
+    const idx = parseInt(origId, 10);
+    const original = xfList[idx];
+    if(!original){ mapping[origId] = origId; return; }
+    let cloned = original;
+    if(/\bfillId="\d+"/.test(cloned)) cloned = cloned.replace(/\bfillId="\d+"/, `fillId="${yellowFillId}"`);
+    else cloned = cloned.replace('<xf ', `<xf fillId="${yellowFillId}" `);
+    if(!/\bapplyFill="1"/.test(cloned)){
+      cloned = /\/>$/.test(cloned) ? cloned.replace(/\/>$/, ' applyFill="1"/>') : cloned.replace('>', ' applyFill="1">');
+    }
+    appended += cloned;
+    mapping[origId] = String(cellXfsCount);
+    cellXfsCount += 1;
+  });
+
+  cellXfsInner += appended;
+  xml = xml.replace(cellXfsMatch[0], `<cellXfs count="${cellXfsCount}">${cellXfsInner}</cellXfs>`);
+  return {xml, mapping};
 }
 
 function getAttr(tag, attr){
@@ -766,6 +832,7 @@ async function exportPatchedXlsx(){
     let sheetXml = await zip.file(target).async('string');
 
     const patches = [];
+    const yellowNeeded = new Set();
     okSuppliers.forEach(s => {
       const block = templateAnalysis.blocks[s.assignedBlock];
       const unitColLetter = XLSX.utils.encode_col(block.unitCol);
@@ -773,7 +840,14 @@ async function exportPatchedXlsx(){
       templateAnalysis.items.forEach(it => {
         const val = getSupplierValueForRow(s, it.row);
         if(val && val.unit !== null && val.unit !== undefined){
-          patches.push({row: it.row+1, col: unitColLetter, type:'number', value: val.unit});
+          const patch = {row: it.row+1, col: unitColLetter, type:'number', value: val.unit};
+          if(val.confidence === 'baixa'){
+            const ref = unitColLetter + (it.row+1);
+            const origStyle = getCellStyleId(sheetXml, ref);
+            patch.styleKey = origStyle;
+            yellowNeeded.add(origStyle);
+          }
+          patches.push(patch);
         }
       });
       if(!block.name && s.fornecedor){
@@ -789,6 +863,14 @@ async function exportPatchedXlsx(){
         patches.push({row: block.freteRow+1, col: totalColLetter, type:'string', value: s.frete});
       }
     });
+
+    if(yellowNeeded.size > 0){
+      const stylesPath = 'xl/styles.xml';
+      const stylesXml = await zip.file(stylesPath).async('string');
+      const result = patchStylesXmlForYellow(stylesXml, Array.from(yellowNeeded));
+      zip.file(stylesPath, result.xml);
+      patches.forEach(p => { if(p.styleKey !== undefined) p.overrideStyle = result.mapping[p.styleKey]; });
+    }
 
     sheetXml = patchSheetXml(sheetXml, patches);
     zip.file(target, sheetXml);
@@ -811,7 +893,7 @@ async function exportPatchedXlsx(){
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    progress.innerHTML += '<div class="okbanner">Arquivo baixado. Abra no Excel — as colunas de melhor preço e totais recalculam sozinhas.</div>';
+    progress.innerHTML += '<div class="okbanner">Arquivo baixado. Células em amarelo são correspondências que a IA não teve certeza total — vale conferir essas. O resto recalcula sozinho no Excel.</div>';
   }catch(err){
     progress.innerHTML += `<div class="errbanner">Não consegui gerar o arquivo final: ${escHtml(err.message)}.</div>`;
   }
