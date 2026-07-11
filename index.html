@@ -447,10 +447,10 @@ async function pdfToImages(file, maxPages, scale){
 }
 
 /* ============================= CLAUDE API CALLS ============================= */
-async function callClaude(content, systemPrompt){
+async function callClaude(content, systemPrompt, maxTokens){
   const response = await fetch('/api/claude', {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({model:'claude-sonnet-5', max_tokens:2000, system:systemPrompt, messages:[{role:'user', content}]})
+    body: JSON.stringify({model:'claude-sonnet-5', max_tokens: maxTokens || 4000, system:systemPrompt, messages:[{role:'user', content}]})
   });
   const data = await response.json();
   if(data.error) throw new Error(data.error.message || 'Erro na API');
@@ -484,7 +484,7 @@ function extractionPrompt(){
 async function extractSupplierData(images){
   const content = images.map(img => ({type:'image', source:{type:'base64', media_type:'image/jpeg', data: img}}));
   content.push({type:'text', text: extractionPrompt()});
-  return safeParseJson(await callClaude(content, EXTRACTION_SYSTEM));
+  return safeParseJson(await callClaude(content, EXTRACTION_SYSTEM, 4000));
 }
 
 const MATCH_SYSTEM = "Você é um especialista em materiais de construção/hidráulica que cruza itens de orçamentos de fornecedores diferentes para o MESMO projeto de obra. Nomes comerciais, marcas e siglas variam muito entre fornecedores, mas o item quase sempre existe no orçamento — ele só está escrito de um jeito diferente. Sua prioridade é encontrar a peça certa usando código, tamanho/diâmetro e tipo de peça como critério principal — não o nome comercial. Responda SOMENTE com JSON válido, sem markdown.";
@@ -500,17 +500,35 @@ function buildMatchPrompt(baseList, itemList, fornecedorNome){
   'Responda apenas:\n' +
   '{"matches": [{"row": numero, "item_index": indice_ou_null, "confianca": "alta"|"media"|"baixa"}]}';
 }
+function chunkArray(arr, size){
+  const chunks = [];
+  for(let i=0; i<arr.length; i+=size) chunks.push(arr.slice(i, i+size));
+  return chunks;
+}
+
+const MATCH_CHUNK_SIZE = 20;
+
 async function matchSupplierItems(supplier){
-  const baseList = templateAnalysis.items.map(b => ({row: b.row, descricao: b.insumo}));
+  const chunks = chunkArray(templateAnalysis.items, MATCH_CHUNK_SIZE);
   const itemList = supplier.itens.map((it, idx) => ({index: idx, descricao: it.descricao, unidade: it.unidade}));
-  const prompt = buildMatchPrompt(baseList, itemList, supplier.fornecedor);
-  const parsed = safeParseJson(await callClaude([{type:'text', text: prompt}], MATCH_SYSTEM));
   const matches = {};
-  (parsed.matches || []).forEach(m => {
-    if(m.item_index !== null && m.item_index !== undefined){
-      matches[m.row] = {itemIndex: m.item_index, confidence: m.confianca || 'media'};
+  supplier.matchWarnings = [];
+  for(let i=0; i<chunks.length; i++){
+    const chunk = chunks[i];
+    const baseList = chunk.map(b => ({row: b.row, descricao: b.insumo}));
+    const prompt = buildMatchPrompt(baseList, itemList, supplier.fornecedor);
+    try{
+      const parsed = safeParseJson(await callClaude([{type:'text', text: prompt}], MATCH_SYSTEM, 4000));
+      (parsed.matches || []).forEach(m => {
+        if(m.item_index !== null && m.item_index !== undefined){
+          matches[m.row] = {itemIndex: m.item_index, confidence: m.confianca || 'media'};
+        }
+      });
+    }catch(err){
+      // Only this batch of rows is affected — previously-matched batches for this supplier are kept.
+      supplier.matchWarnings.push('itens ' + (chunk[0].row+1) + '–' + (chunk[chunk.length-1].row+1) + ': ' + err.message);
     }
-  });
+  }
   return matches;
 }
 
@@ -609,9 +627,12 @@ async function generateComparison(){
   progress.innerHTML = '';
   for(let i=0;i<okSuppliers.length;i++){
     const s = okSuppliers[i];
-    progress.innerHTML = `<div class="progressLine">Comparando itens de "${escHtml(s.fornecedor)}"… (${i+1}/${okSuppliers.length})</div>`;
+    progress.innerHTML += `<div class="progressLine">Comparando itens de "${escHtml(s.fornecedor)}"… (${i+1}/${okSuppliers.length})</div>`;
     try{
       s.matches = await matchSupplierItems(s);
+      if(s.matchWarnings && s.matchWarnings.length){
+        progress.innerHTML += `<div class="warnbanner">Em "${escHtml(s.fornecedor)}", alguns lotes de itens falharam e ficaram sem correspondência automática (${s.matchWarnings.map(escHtml).join('; ')}). Confira e selecione manualmente esses na tabela.</div>`;
+      }
     }catch(err){
       s.matches = {};
       progress.innerHTML += `<div class="warnbanner">Não consegui cruzar automaticamente os itens de "${escHtml(s.fornecedor)}" (${escHtml(err.message)}). Selecione manualmente na tabela.</div>`;
