@@ -93,12 +93,14 @@
   table.compTbl td.best{background:#FBE9C9; font-weight:700;}
   table.compTbl td.best::after{content:"★"; color:var(--amber-deep); margin-left:4px; font-size:10px;}
   table.compTbl td.lowconf{background:#FFF3A3; box-shadow:inset 0 0 0 2px #E8D14A;}
+  table.compTbl td.dupewarn{background:#FBDCC0; box-shadow:inset 0 0 0 2px var(--brick);}
+  table.compTbl td.lowconf.dupewarn{background:repeating-linear-gradient(45deg, #FFF3A3, #FFF3A3 8px, #FBDCC0 8px, #FBDCC0 16px);}
   table.compTbl input.cellnum{width:82px; border:1px solid transparent; background:transparent; font-family:var(--mono); font-size:12.5px; text-align:right; padding:3px 4px; border-radius:2px;}
   table.compTbl input.cellnum:hover{border-color:var(--line-strong);}
   table.compTbl input.cellnum:focus{outline:none; border-color:var(--teal); background:var(--white);}
   select.matchSel{font-family:var(--sans); font-size:11px; max-width:150px; border:1px solid var(--line-strong); border-radius:2px; padding:2px; margin-top:2px; background:var(--white);}
   .conf{font-size:9.5px; font-family:var(--mono); padding:1px 5px; border-radius:8px; margin-top:2px; display:inline-block;}
-  .conf.alta{background:#DCEEE0; color:#255C36;} .conf.media{background:#FCF1DC; color:#7A4E0A;} .conf.baixa{background:#FBE2DC; color:#8A2E1B;} .conf.manual{background:#DCE6EE; color:#1F4E6E;}
+  .conf.alta{background:#DCEEE0; color:#255C36;} .conf.media{background:#FCF1DC; color:#7A4E0A;} .conf.baixa{background:#FBE2DC; color:#8A2E1B;} .conf.manual{background:#DCE6EE; color:#1F4E6E;} .conf.dupe{background:#FBDCC0; color:#8A3B1B; font-weight:700;}
   tr.totalRow td{background:var(--paper-2); font-weight:700; font-family:var(--mono);}
   .progressLine{font-family:var(--mono); font-size:12.5px; color:var(--teal-deep); margin-top:10px;}
   footer.note{max-width:1500px; margin:0 auto; padding:0 5vw 60px; color:var(--ink-soft); font-size:12px; line-height:1.6;}
@@ -655,10 +657,36 @@ function getSupplierValueForRow(supplier, row){
   if(!it) return null;
   return {unit: it.valorUnit, total: it.valorTotal, confidence: m.confidence, itemIndex: m.itemIndex};
 }
+
+// Returns a Map of itemIndex -> array of rows that currently use that same item for this supplier.
+function computeItemUsage(supplier){
+  const usage = {};
+  Object.keys(supplier.matches).forEach(row => {
+    const m = supplier.matches[row];
+    if(m.itemIndex===null || m.itemIndex===undefined) return;
+    (usage[m.itemIndex] = usage[m.itemIndex] || []).push(parseInt(row,10));
+  });
+  return usage;
+}
+
 function setManualMatch(supplierId, row, itemIndexStr){
   const s = suppliers.find(x=>x.id===supplierId); if(!s) return;
   if(itemIndexStr==='' ) delete s.matches[row];
   else s.matches[row] = {itemIndex: parseInt(itemIndexStr,10), confidence:'manual'};
+  if(itemIndexStr !== ''){
+    const usage = computeItemUsage(s);
+    const rowsUsingIt = usage[itemIndexStr] || usage[parseInt(itemIndexStr,10)] || [];
+    if(rowsUsingIt.length > 1){
+      const otherRows = rowsUsingIt.filter(r => r !== row);
+      const otherInsumos = otherRows.map(r => {
+        const it = templateAnalysis.items.find(x => x.row === r);
+        return it ? it.insumo : ('linha ' + r);
+      });
+      const itemDesc = s.itens[parseInt(itemIndexStr,10)] ? s.itens[parseInt(itemIndexStr,10)].descricao : '';
+      const progress = document.getElementById('progressWrap');
+      progress.innerHTML += `<div class="warnbanner">Atenção: em "${escHtml(s.fornecedor)}", o item "${escHtml(itemDesc)}" agora está sendo usado em mais de uma linha (também em: ${otherInsumos.map(escHtml).join(', ')}). Marquei as duas em laranja na tabela — confira qual está certa.</div>`;
+    }
+  }
   renderComparisonTable();
 }
 function setManualCell(supplierId, row, field, value){
@@ -688,6 +716,20 @@ function renderComparisonTable(){
   let tbody = '<tbody>';
   const totalsPerSupplier = okSuppliers.map(()=>0);
   let bestGrandTotal = 0;
+  const usageBySupplier = {};
+  okSuppliers.forEach(s => { usageBySupplier[s.id] = computeItemUsage(s); });
+  const dupeMessages = [];
+  okSuppliers.forEach(s => {
+    const usage = usageBySupplier[s.id];
+    Object.keys(usage).forEach(itemIdx => {
+      const rows = usage[itemIdx];
+      if(rows.length > 1){
+        const insumoNames = rows.map(r => { const it = templateAnalysis.items.find(x=>x.row===r); return it ? it.insumo : ('linha '+r); });
+        const itemDesc = s.itens[itemIdx] ? s.itens[itemIdx].descricao : '';
+        dupeMessages.push(`"${escHtml(s.fornecedor)}": item "${escHtml(itemDesc)}" usado em ${insumoNames.map(escHtml).join(' e ')}`);
+      }
+    });
+  });
 
   templateAnalysis.items.forEach(b => {
     let rowBest = null;
@@ -702,14 +744,17 @@ function renderComparisonTable(){
       }
       const confBadge = val && val.confidence ? `<div class="conf ${val.confidence}">${val.confidence}</div>` : '';
       const lowConfClass = val && val.confidence === 'baixa' ? ' lowconf' : '';
+      const isDupe = val && usageBySupplier[s.id][val.itemIndex] && usageBySupplier[s.id][val.itemIndex].length > 1;
+      const dupeClass = isDupe ? ' dupewarn' : '';
+      const dupeBadge = isDupe ? '<div class="conf dupe">em uso 2x</div>' : '';
       const options = ['<option value="">— sem correspondência —</option>']
         .concat(s.itens.map((it,idx)=>`<option value="${idx}" ${val && val.itemIndex===idx?'selected':''}>${escHtml(it.descricao)} (R$ ${fmtNum(it.valorUnit)})</option>`));
-      rowCells += `<td class="num${lowConfClass}">
+      rowCells += `<td class="num${lowConfClass}${dupeClass}">
           <input class="cellnum" value="${unit===null?'':unit}" onchange="setManualCell('${s.id}',${b.row},'unit',this.value)">
-          ${confBadge}
+          ${confBadge}${dupeBadge}
           <select class="matchSel" onchange="setManualMatch('${s.id}',${b.row},this.value)">${options.join('')}</select>
         </td>
-        <td class="num${lowConfClass}"><input class="cellnum" value="${total===null?'':total}" onchange="setManualCell('${s.id}',${b.row},'total',this.value)"></td>`;
+        <td class="num${lowConfClass}${dupeClass}"><input class="cellnum" value="${total===null?'':total}" onchange="setManualCell('${s.id}',${b.row},'total',this.value)"></td>`;
     });
     if(rowBest) bestGrandTotal += rowBest.total;
     tbody += `<tr>
@@ -728,7 +773,11 @@ function renderComparisonTable(){
   okSuppliers.forEach((s,si) => { totalRow += `<td colspan="2" class="num">R$ ${fmtNum(totalsPerSupplier[si])}</td>`; });
   totalRow += `<td colspan="2" class="num">R$ ${fmtNum(bestGrandTotal)}</td><td></td></tr>`;
 
-  wrap.innerHTML = `<div class="compWrap"><table class="compTbl">${thead}${tbody}${totalRow}</table></div>`;
+  const dupeBanner = dupeMessages.length
+    ? `<div class="warnbanner">⚠ Item repetido na mesma coluna: ${dupeMessages.join(' — ')}. As células envolvidas estão marcadas em laranja abaixo.</div>`
+    : '';
+
+  wrap.innerHTML = `${dupeBanner}<div class="compWrap"><table class="compTbl">${thead}${tbody}${totalRow}</table></div>`;
 }
 
 /* ============================= EXPORT: SURGICAL XLSX PATCH ============================= */
@@ -778,19 +827,27 @@ function xfMatches(cellXfsInner){
   return cellXfsInner.match(/<xf\b[^>]*\/>|<xf\b[^>]*>[\s\S]*?<\/xf>/g) || [];
 }
 
-// Adds a yellow fill to styles.xml and clones the given original cell styles with that fill applied,
-// so low-confidence matches can be highlighted in the downloaded file without disturbing any other formatting.
-function patchStylesXmlForYellow(stylesXml, originalStyleIds){
+// Adds one or more solid-fill colors to styles.xml and clones the given original cell styles with
+// those fills applied, so highlights (low-confidence, duplicate-usage, etc.) show up in the downloaded
+// file without disturbing any other formatting. `requests` is an array of {styleId, colorHex} where
+// colorHex is an 8-digit ARGB hex string (e.g. "FFFFF3A3").
+function patchStylesXmlForHighlights(stylesXml, requests){
   let xml = stylesXml;
-  const mapping = {};
-  if(originalStyleIds.length === 0) return {xml, mapping};
+  const mapping = {}; // key `${styleId}|${colorHex}` -> new style id
+  if(requests.length === 0) return {xml, mapping};
 
   const fillsMatch = xml.match(/<fills count="(\d+)">([\s\S]*?)<\/fills>/);
   if(!fillsMatch) return {xml, mapping}; // unexpected styles.xml shape — skip highlighting rather than risk corruption
-  const fillsCount = parseInt(fillsMatch[1], 10);
-  const yellowFillId = fillsCount;
-  const newFillsInner = fillsMatch[2] + '<fill><patternFill patternType="solid"><fgColor rgb="FFFFF3A3"/><bgColor indexed="64"/></patternFill></fill>';
-  xml = xml.replace(fillsMatch[0], `<fills count="${fillsCount+1}">${newFillsInner}</fills>`);
+  let fillsCount = parseInt(fillsMatch[1], 10);
+  let fillsInner = fillsMatch[2];
+  const fillIdByColor = {};
+  const uniqueColors = Array.from(new Set(requests.map(r => r.colorHex)));
+  uniqueColors.forEach(color => {
+    fillIdByColor[color] = fillsCount;
+    fillsInner += `<fill><patternFill patternType="solid"><fgColor rgb="${color}"/><bgColor indexed="64"/></patternFill></fill>`;
+    fillsCount += 1;
+  });
+  xml = xml.replace(fillsMatch[0], `<fills count="${fillsCount}">${fillsInner}</fills>`);
 
   const cellXfsMatch = xml.match(/<cellXfs count="(\d+)">([\s\S]*?)<\/cellXfs>/);
   if(!cellXfsMatch) return {xml: stylesXml, mapping}; // bail out safely, keep original styles.xml untouched
@@ -799,18 +856,23 @@ function patchStylesXmlForYellow(stylesXml, originalStyleIds){
   const xfList = xfMatches(cellXfsInner);
 
   let appended = '';
-  originalStyleIds.forEach(origId => {
-    const idx = parseInt(origId, 10);
+  const seen = {};
+  requests.forEach(req => {
+    const key = req.styleId + '|' + req.colorHex;
+    if(seen[key]) return;
+    seen[key] = true;
+    const idx = parseInt(req.styleId, 10);
     const original = xfList[idx];
-    if(!original){ mapping[origId] = origId; return; }
+    if(!original){ mapping[key] = req.styleId; return; }
+    const fillId = fillIdByColor[req.colorHex];
     let cloned = original;
-    if(/\bfillId="\d+"/.test(cloned)) cloned = cloned.replace(/\bfillId="\d+"/, `fillId="${yellowFillId}"`);
-    else cloned = cloned.replace('<xf ', `<xf fillId="${yellowFillId}" `);
+    if(/\bfillId="\d+"/.test(cloned)) cloned = cloned.replace(/\bfillId="\d+"/, `fillId="${fillId}"`);
+    else cloned = cloned.replace('<xf ', `<xf fillId="${fillId}" `);
     if(!/\bapplyFill="1"/.test(cloned)){
       cloned = /\/>$/.test(cloned) ? cloned.replace(/\/>$/, ' applyFill="1"/>') : cloned.replace('>', ' applyFill="1">');
     }
     appended += cloned;
-    mapping[origId] = String(cellXfsCount);
+    mapping[key] = String(cellXfsCount);
     cellXfsCount += 1;
   });
 
@@ -852,21 +914,27 @@ async function exportPatchedXlsx(){
 
     let sheetXml = await zip.file(target).async('string');
 
+    const YELLOW = 'FFFFF3A3';
+    const ORANGE = 'FFFBDCC0';
+
     const patches = [];
-    const yellowNeeded = new Set();
+    const highlightRequests = [];
     okSuppliers.forEach(s => {
       const block = templateAnalysis.blocks[s.assignedBlock];
       const unitColLetter = XLSX.utils.encode_col(block.unitCol);
       const totalColLetter = XLSX.utils.encode_col(block.totalCol);
+      const usage = computeItemUsage(s);
       templateAnalysis.items.forEach(it => {
         const val = getSupplierValueForRow(s, it.row);
         if(val && val.unit !== null && val.unit !== undefined){
           const patch = {row: it.row+1, col: unitColLetter, type:'number', value: val.unit};
-          if(val.confidence === 'baixa'){
+          const isDupe = usage[val.itemIndex] && usage[val.itemIndex].length > 1;
+          const color = isDupe ? ORANGE : (val.confidence === 'baixa' ? YELLOW : null);
+          if(color){
             const ref = unitColLetter + (it.row+1);
             const origStyle = getCellStyleId(sheetXml, ref);
-            patch.styleKey = origStyle;
-            yellowNeeded.add(origStyle);
+            patch.styleKey = origStyle + '|' + color;
+            highlightRequests.push({styleId: origStyle, colorHex: color});
           }
           patches.push(patch);
         }
@@ -885,10 +953,10 @@ async function exportPatchedXlsx(){
       }
     });
 
-    if(yellowNeeded.size > 0){
+    if(highlightRequests.length > 0){
       const stylesPath = 'xl/styles.xml';
       const stylesXml = await zip.file(stylesPath).async('string');
-      const result = patchStylesXmlForYellow(stylesXml, Array.from(yellowNeeded));
+      const result = patchStylesXmlForHighlights(stylesXml, highlightRequests);
       zip.file(stylesPath, result.xml);
       patches.forEach(p => { if(p.styleKey !== undefined) p.overrideStyle = result.mapping[p.styleKey]; });
     }
@@ -914,7 +982,7 @@ async function exportPatchedXlsx(){
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    progress.innerHTML += '<div class="okbanner">Arquivo baixado. Células em amarelo são correspondências que a IA não teve certeza total — vale conferir essas. O resto recalcula sozinho no Excel.</div>';
+    progress.innerHTML += '<div class="okbanner">Arquivo baixado. Amarelo = a IA não teve certeza total (confira). Laranja = o mesmo item foi usado em mais de uma linha (escolha manualmente qual está certa). O resto recalcula sozinho no Excel.</div>';
   }catch(err){
     progress.innerHTML += `<div class="errbanner">Não consegui gerar o arquivo final: ${escHtml(err.message)}.</div>`;
   }
